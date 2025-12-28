@@ -139,7 +139,22 @@ const Scanner = () => {
         body: { latitude: lat, longitude: lng },
       });
       if (!error && data) {
-        setEnvData(data);
+        // Normalize location to a string
+        let loc: string = '';
+        if (typeof data.location === 'object' && data.location) {
+          loc = data.location.city || data.location.displayName || '';
+        } else if (typeof data.location === 'string') {
+          loc = data.location;
+        }
+        setEnvData({
+          aqi: data.airQuality?.aqi ?? 0,
+          aqiLevel: data.airQuality?.level ?? '',
+          temperature: data.weather?.temperature ?? 0,
+          humidity: data.weather?.humidity ?? 0,
+          solarPotential: data.weather?.uvIndex ? Math.min(data.weather.uvIndex * 10, 100) : 0,
+          solarRating: data.weather?.uvIndex >= 6 ? 'High' : data.weather?.uvIndex >= 3 ? 'Moderate' : 'Low',
+          location: loc,
+        });
       }
     } catch (err) {
       console.error("Error fetching environment data:", err);
