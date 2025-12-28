@@ -14,7 +14,132 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string
+          eco_creds: number
+          email: string
+          id: string
+          name: string
+          phone: string | null
+          total_reports: number
+          total_scans: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          eco_creds?: number
+          email: string
+          id?: string
+          name: string
+          phone?: string | null
+          total_reports?: number
+          total_scans?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          eco_creds?: number
+          email?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          total_reports?: number
+          total_scans?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          created_at: string
+          description: string | null
+          eco_creds_earned: number
+          id: string
+          image_url: string | null
+          latitude: number | null
+          location: string
+          longitude: number | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          eco_creds_earned?: number
+          id?: string
+          image_url?: string | null
+          latitude?: number | null
+          location: string
+          longitude?: number | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          eco_creds_earned?: number
+          id?: string
+          image_url?: string | null
+          latitude?: number | null
+          location?: string
+          longitude?: number | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      scans: {
+        Row: {
+          confidence_score: number | null
+          created_at: string
+          disposal_instructions: string
+          eco_creds_earned: number
+          eco_tips: string
+          environmental_impact: string
+          id: string
+          image_url: string | null
+          item_name: string
+          latitude: number | null
+          longitude: number | null
+          user_id: string
+          waste_category: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string
+          disposal_instructions: string
+          eco_creds_earned?: number
+          eco_tips: string
+          environmental_impact: string
+          id?: string
+          image_url?: string | null
+          item_name: string
+          latitude?: number | null
+          longitude?: number | null
+          user_id: string
+          waste_category: string
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string
+          disposal_instructions?: string
+          eco_creds_earned?: number
+          eco_tips?: string
+          environmental_impact?: string
+          id?: string
+          image_url?: string | null
+          item_name?: string
+          latitude?: number | null
+          longitude?: number | null
+          user_id?: string
+          waste_category?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

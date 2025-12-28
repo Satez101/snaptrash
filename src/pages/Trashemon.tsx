@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -13,37 +13,62 @@ import {
   Recycle,
   Trash2,
   Info,
+  Navigation,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface ScanResult {
+  category: string;
+  item: string;
+  disposal: string;
+  tips: string;
+  impact: string;
+  recyclable: boolean;
+  confidence?: number;
+}
+
+interface LocationCoords {
+  latitude: number;
+  longitude: number;
+}
 
 const Trashemon = () => {
+  const { profile, refreshProfile } = useAuth();
   const [locationGranted, setLocationGranted] = useState(false);
   const [locationError, setLocationError] = useState(false);
+  const [coords, setCoords] = useState<LocationCoords | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Demo data
-  const points = 0;
-  const scannedCount = 0;
+  const points = profile?.eco_creds || 0;
+  const scannedCount = profile?.total_scans || 0;
 
-  interface ScanResult {
-    category: string;
-    item: string;
-    disposal: string;
-    tips: string;
-    impact: string;
-    recyclable: boolean;
-  }
+  useEffect(() => {
+    // Check if location is already granted
+    navigator.permissions?.query({ name: 'geolocation' }).then((result) => {
+      if (result.state === 'granted') {
+        requestLocation();
+      }
+    });
+  }, []);
 
   const requestLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        () => {
+        (position) => {
           setLocationGranted(true);
           setLocationError(false);
+          setCoords({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
         },
         () => {
           setLocationError(true);
@@ -54,25 +79,79 @@ const Trashemon = () => {
 
   const handleImageCapture = async (file: File) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      setCapturedImage(e.target?.result as string);
+    reader.onload = async (e) => {
+      const imageBase64 = e.target?.result as string;
+      setCapturedImage(imageBase64);
+      
+      // Send to AI for analysis
+      setIsScanning(true);
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('analyze-trash', {
+          body: { imageBase64 }
+        });
+
+        if (error) {
+          console.error('Error analyzing image:', error);
+          toast.error('Failed to analyze image. Please try again.');
+          setIsScanning(false);
+          return;
+        }
+
+        if (data.error) {
+          toast.error(data.error);
+          setIsScanning(false);
+          return;
+        }
+
+        if (!data.success) {
+          toast.error(data.error || 'Could not identify the item. Please try again with a clearer photo.');
+          setIsScanning(false);
+          setCapturedImage(null);
+          return;
+        }
+
+        // Save scan to database
+        const { error: insertError } = await supabase
+          .from('scans')
+          .insert({
+            user_id: profile?.user_id,
+            waste_category: data.category,
+            item_name: data.item,
+            disposal_instructions: data.disposal,
+            eco_tips: data.tips,
+            environmental_impact: data.impact,
+            confidence_score: data.confidence,
+            latitude: coords?.latitude,
+            longitude: coords?.longitude,
+            eco_creds_earned: 10,
+          });
+
+        if (insertError) {
+          console.error('Error saving scan:', insertError);
+          toast.error('Failed to save scan results');
+        } else {
+          toast.success('+10 EcoCreds earned!');
+          await refreshProfile();
+        }
+
+        setScanResult({
+          category: data.category,
+          item: data.item,
+          disposal: data.disposal,
+          tips: data.tips,
+          impact: data.impact,
+          recyclable: data.recyclable,
+          confidence: data.confidence,
+        });
+      } catch (err) {
+        console.error('Error:', err);
+        toast.error('An error occurred while analyzing the image');
+      } finally {
+        setIsScanning(false);
+      }
     };
     reader.readAsDataURL(file);
-
-    // Simulate scanning
-    setIsScanning(true);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    // Demo result
-    setScanResult({
-      category: "Plastic",
-      item: "PET Bottle",
-      disposal: "Rinse and place in recycling bin. Remove cap and label if possible.",
-      tips: "Consider switching to reusable bottles to reduce plastic waste.",
-      impact: "Recycling one plastic bottle saves enough energy to power a laptop for 25 minutes.",
-      recyclable: true,
-    });
-    setIsScanning(false);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,6 +164,15 @@ const Trashemon = () => {
   const resetScan = () => {
     setScanResult(null);
     setCapturedImage(null);
+  };
+
+  const openMapsNavigation = () => {
+    if (coords) {
+      // Search for nearby recycling centers
+      const query = encodeURIComponent('recycling center');
+      const url = `https://www.google.com/maps/search/${query}/@${coords.latitude},${coords.longitude},14z`;
+      window.open(url, '_blank');
+    }
   };
 
   return (
@@ -115,15 +203,22 @@ const Trashemon = () => {
         {/* Location Status */}
         <div className="glass-card p-4 mb-6 animate-fade-in" style={{ animationDelay: '0.1s' }}>
           {locationGranted ? (
-            <div className="flex items-center gap-3 text-accent">
-              <MapPin className="w-5 h-5" />
-              <span className="text-sm">Location enabled - finding nearby disposal centers</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 text-accent">
+                <MapPin className="w-5 h-5" />
+                <span className="text-sm">Location enabled</span>
+              </div>
+              <Button variant="outline" size="sm" onClick={openMapsNavigation} className="gap-2">
+                <Navigation className="w-4 h-4" />
+                Find Disposal Centers
+                <ExternalLink className="w-3 h-3" />
+              </Button>
             </div>
           ) : (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-3 text-muted-foreground">
                 <AlertCircle className="w-5 h-5" />
-                <span className="text-sm">Please enable location for nearby disposal options</span>
+                <span className="text-sm">Enable location for nearby disposal options</span>
               </div>
               <Button variant="outline" size="sm" onClick={requestLocation}>
                 Enable Location
@@ -225,6 +320,14 @@ const Trashemon = () => {
                   </h4>
                   <p className="text-muted-foreground text-sm">{scanResult.impact}</p>
                 </div>
+
+                {locationGranted && (
+                  <Button variant="outline" className="w-full gap-2" onClick={openMapsNavigation}>
+                    <Navigation className="w-4 h-4" />
+                    Find Nearby Disposal Centers
+                    <ExternalLink className="w-3 h-3" />
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -247,7 +350,7 @@ const Trashemon = () => {
               {isScanning ? (
                 <div className="flex flex-col items-center gap-4 py-8">
                   <Loader2 className="w-12 h-12 text-primary animate-spin" />
-                  <p className="text-muted-foreground">Analyzing trash monster...</p>
+                  <p className="text-muted-foreground">AI is analyzing your image...</p>
                 </div>
               ) : (
                 <div className="space-y-4">
