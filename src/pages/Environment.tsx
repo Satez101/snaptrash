@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Wind, 
   MapPin,
@@ -11,9 +11,12 @@ import {
   X,
   Navigation,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Search,
+  MapPinned
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +25,14 @@ import AQIStoryCard from "@/components/environment/AQIStoryCard";
 import IndustryStoryCard from "@/components/environment/IndustryStoryCard";
 import WaterBodyStoryCard from "@/components/environment/WaterBodyStoryCard";
 import SolutionsStoryCard from "@/components/environment/SolutionsStoryCard";
+
+interface SearchResult {
+  name: string;
+  admin1?: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+}
 
 interface EnvironmentData {
   location: {
@@ -105,6 +116,52 @@ const Environment = () => {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const searchLocation = async (query: string) => {
+    if (query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    
+    setSearching(true);
+    try {
+      const response = await fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=en&format=json`
+      );
+      const data = await response.json();
+      setSearchResults(data.results || []);
+    } catch (error) {
+      console.error("Search error:", error);
+      setSearchResults([]);
+    }
+    setSearching(false);
+  };
+
+  const handleSearchInput = (value: string) => {
+    setSearchQuery(value);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      searchLocation(value);
+    }, 300);
+  };
+
+  const selectLocation = async (result: SearchResult) => {
+    setShowSearch(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setLoading(true);
+    setCoords({ lat: result.latitude, lng: result.longitude });
+    toast.success(`Location set to ${result.name}`);
+    await fetchEnvironmentData(result.latitude, result.longitude);
+    setLoading(false);
+  };
 
   const cardGradients = [
     "from-blue-600 via-blue-700 to-indigo-800",
@@ -269,9 +326,47 @@ const Environment = () => {
             <MapPin className="w-8 h-8 text-destructive" />
           </div>
           <h2 className="text-xl font-semibold text-foreground mb-2">Location Required</h2>
-          <p className="text-muted-foreground text-sm mb-6">{locationError || "Unable to load data"}</p>
+          <p className="text-muted-foreground text-sm mb-4">{locationError || "Unable to load data"}</p>
+          
+          {/* Search box for manual location */}
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search for a city..."
+                value={searchQuery}
+                onChange={(e) => handleSearchInput(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            {searchResults.length > 0 && (
+              <div className="mt-2 bg-card border border-border rounded-lg overflow-hidden shadow-lg">
+                {searchResults.map((result, i) => (
+                  <button
+                    key={i}
+                    onClick={() => selectLocation(result)}
+                    className="w-full px-4 py-3 text-left hover:bg-accent/50 border-b border-border last:border-0 flex items-center gap-3"
+                  >
+                    <MapPinned className="w-4 h-4 text-primary shrink-0" />
+                    <div>
+                      <p className="text-foreground font-medium">{result.name}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {result.admin1 ? `${result.admin1}, ` : ""}{result.country}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {searching && (
+              <div className="mt-2 flex items-center justify-center py-3">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
+          
           <Button onClick={requestLocationPermission} className="w-full mb-2">
-            <RefreshCw className="w-4 h-4 mr-2" /> Try Again
+            <Navigation className="w-4 h-4 mr-2" /> Use GPS Location
           </Button>
           <Link to="/dashboard">
             <Button variant="ghost" className="w-full">
@@ -285,6 +380,71 @@ const Environment = () => {
 
   return (
     <div className="min-h-screen bg-black">
+      {/* Search overlay */}
+      <AnimatePresence>
+        {showSearch && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm"
+          >
+            <div className="p-4 max-w-md mx-auto">
+              <div className="flex items-center gap-2 mb-4">
+                <Button variant="ghost" size="icon" onClick={() => setShowSearch(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+                <h2 className="text-lg font-semibold">Search Location</h2>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search for a city..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearchInput(e.target.value)}
+                  className="pl-10"
+                  autoFocus
+                />
+              </div>
+              {searchResults.length > 0 && (
+                <div className="mt-3 bg-card border border-border rounded-lg overflow-hidden shadow-lg">
+                  {searchResults.map((result, i) => (
+                    <button
+                      key={i}
+                      onClick={() => selectLocation(result)}
+                      className="w-full px-4 py-3 text-left hover:bg-accent/50 border-b border-border last:border-0 flex items-center gap-3"
+                    >
+                      <MapPinned className="w-4 h-4 text-primary shrink-0" />
+                      <div>
+                        <p className="text-foreground font-medium">{result.name}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {result.admin1 ? `${result.admin1}, ` : ""}{result.country}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {searching && (
+                <div className="mt-4 flex items-center justify-center py-3">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              )}
+              <Button 
+                variant="outline" 
+                className="w-full mt-4"
+                onClick={() => {
+                  setShowSearch(false);
+                  requestLocationPermission();
+                }}
+              >
+                <Navigation className="w-4 h-4 mr-2" /> Use GPS Instead
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-30 p-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent">
         <Link to="/dashboard">
@@ -292,14 +452,18 @@ const Environment = () => {
             <X className="w-5 h-5" />
           </Button>
         </Link>
-        <div className="text-center flex-1 px-4">
+        <button 
+          onClick={() => setShowSearch(true)}
+          className="text-center flex-1 px-4 hover:opacity-80 transition-opacity"
+        >
           <div className="flex items-center justify-center gap-1 text-white/80 text-sm">
             <MapPin className="w-3 h-3" />
             <span className="truncate max-w-[200px]">
               {data.location.city || data.location.displayName}
             </span>
+            <Search className="w-3 h-3 ml-1" />
           </div>
-        </div>
+        </button>
         <Button 
           variant="ghost" 
           size="icon" 
