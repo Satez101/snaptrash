@@ -5,6 +5,70 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const systemPrompt = `You are SnapTrash Vision AI, an expert waste-identification system trained to recognize real-world trash items, including complex, multi-material objects.
+
+Your task is to analyze uploaded images and provide the most accurate possible identification, even when:
+- The image quality is imperfect
+- The object is partially visible
+- The item is made of multiple materials
+- The item belongs to electronic or mixed-waste categories
+
+❗ CRITICAL RULES:
+1. ALWAYS attempt a best-guess identification - Do NOT refuse analysis for common objects
+2. Do NOT default to "unclear" unless the image is completely empty or totally unrelated to waste/objects
+3. If the item appears electronic (e.g., headphones, chargers, cables, remotes, phones, batteries), classify it as E-Waste
+4. If multiple materials are present, choose the most responsible disposal category based on the primary/dominant material or environmental concern
+5. For items that combine materials (e.g., coffee cup with plastic lid), identify as Mixed Waste and explain each component
+
+WASTE CATEGORIES (choose one):
+- Plastic (bottles, containers, packaging, bags, wrappers)
+- Metal (cans, foil, metal containers, utensils)
+- Glass (bottles, jars, broken glass)
+- Paper (newspapers, cardboard, magazines, receipts)
+- Organic (food waste, yard waste, compostables)
+- E-Waste (electronics, batteries, cables, phones, headphones, chargers, remotes)
+- Hazardous (chemicals, paint, medical waste, fluorescent bulbs)
+- Textile (clothes, fabric, shoes)
+- Mixed Waste (multi-material items that can't be easily separated)
+
+Your response MUST be a valid JSON object with this EXACT structure:
+
+{
+  "success": true,
+  "category": "string (one of the categories above)",
+  "item": "string (specific item name like 'Wired Headphones', 'PET Bottle', 'Aluminum Can', etc.)",
+  "disposal": "string (detailed, responsible disposal instructions specific to this item)",
+  "tips": "string (one practical eco-friendly suggestion related to this waste type)",
+  "impact": "string (clear environmental impact in simple terms - what happens if improperly disposed)",
+  "recyclable": boolean (true if item can be recycled through standard recycling, false if needs special handling),
+  "confidence": number (0.0 to 1.0 - be honest about certainty)
+}
+
+CONFIDENCE HANDLING:
+- High confidence (0.85-1.0): Clear, well-lit object that you can identify with certainty
+- Medium confidence (0.6-0.84): Partially visible or slightly unclear, but you can make a reasonable identification
+- Low confidence (0.3-0.59): Poor image quality but you can still attempt identification - add disclaimer in disposal field like "Based on visible features, this appears to be..."
+- Only return success: false if confidence would be below 0.3 (image is completely empty, blurry beyond recognition, or shows nothing waste-related)
+
+ONLY return success: false when the image is COMPLETELY UNUSABLE:
+{
+  "success": false,
+  "error": "Unable to identify - the image appears to be completely empty or contains no visible objects. Please capture a photo of the item you'd like to identify."
+}
+
+EXAMPLES OF WHAT TO ALWAYS IDENTIFY (never refuse):
+- Headphones/earbuds → E-Waste
+- Phone charger/cable → E-Waste
+- Remote control → E-Waste
+- Plastic bottle → Plastic
+- Coffee cup → Mixed Waste (paper cup + plastic lid)
+- Pizza box with grease → Mixed Waste (contaminated paper)
+- Banana peel → Organic
+- Broken electronics → E-Waste
+- Clothing items → Textile
+
+Your goal is to HELP USERS ACT, not to reject their input. Always provide actionable disposal guidance.`;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -29,7 +93,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('Sending image to AI for analysis...');
+    console.log('SnapTrash Vision AI: Analyzing image...');
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -42,34 +106,14 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert waste classification AI for an environmental app called Ecoza. Analyze the image and identify any trash, waste, or recyclable items.
-
-Your response MUST be a valid JSON object with this exact structure:
-{
-  "success": true,
-  "category": "string (one of: Plastic, Metal, Glass, Paper, Organic, E-Waste, Hazardous, Textile, Mixed Waste)",
-  "item": "string (specific item name like 'PET Bottle', 'Aluminum Can', 'Banana Peel', etc.)",
-  "disposal": "string (detailed disposal instructions specific to this item)",
-  "tips": "string (eco-friendly tips related to this type of waste)",
-  "impact": "string (environmental impact facts about this waste type)",
-  "recyclable": boolean,
-  "confidence": number (0.0 to 1.0)
-}
-
-If you cannot identify waste in the image, return:
-{
-  "success": false,
-  "error": "Item unclear — please retake photo with better lighting or a clearer angle."
-}
-
-Be specific and accurate. Different items should get different responses.`
+            content: systemPrompt
           },
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: 'Analyze this image and identify any trash or waste items. Provide detailed classification and disposal instructions.'
+                text: 'Analyze this image and identify the waste item. Provide detailed classification and responsible disposal instructions. Remember: ALWAYS attempt identification unless the image is completely empty.'
               },
               {
                 type: 'image_url',
@@ -117,23 +161,61 @@ Be specific and accurate. Different items should get different responses.`
       );
     }
 
-    console.log('AI response:', content);
+    console.log('SnapTrash Vision AI response:', content);
 
     // Parse the JSON from the AI response
     let result;
     try {
-      // Try to extract JSON from the response
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        result = JSON.parse(jsonMatch[0]);
+      // Try to extract JSON from the response (handle markdown code blocks)
+      let jsonString = content;
+      
+      // Remove markdown code blocks if present
+      const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        jsonString = codeBlockMatch[1].trim();
       } else {
-        result = JSON.parse(content);
+        // Try to find raw JSON object
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonString = jsonMatch[0];
+        }
       }
+      
+      result = JSON.parse(jsonString);
+      
+      // Ensure required fields exist
+      if (result.success === undefined) {
+        result.success = true;
+      }
+      
+      // Validate and sanitize the response
+      if (result.success) {
+        result.category = result.category || 'Mixed Waste';
+        result.item = result.item || 'Unidentified Item';
+        result.disposal = result.disposal || 'Please check with your local waste management facility for proper disposal.';
+        result.tips = result.tips || 'Consider if this item can be reused before disposing.';
+        result.impact = result.impact || 'Improper disposal can contribute to landfill overflow and environmental pollution.';
+        result.recyclable = result.recyclable ?? false;
+        result.confidence = typeof result.confidence === 'number' ? Math.min(1, Math.max(0, result.confidence)) : 0.7;
+      }
+      
     } catch (parseError) {
       console.error('Failed to parse AI response as JSON:', parseError);
+      console.error('Raw content:', content);
+      
+      // Attempt to create a reasonable response from failed parse
       return new Response(
-        JSON.stringify({ error: 'Failed to parse analysis result' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          success: true,
+          category: 'Mixed Waste',
+          item: 'Unidentified Item',
+          disposal: 'Unable to fully analyze. Please check with your local waste management facility for proper disposal of this item.',
+          tips: 'When in doubt, check your local recycling guidelines or contact waste management.',
+          impact: 'Proper disposal prevents environmental contamination and supports recycling efforts.',
+          recyclable: false,
+          confidence: 0.4
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
