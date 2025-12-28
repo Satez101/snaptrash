@@ -8,9 +8,13 @@ import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import Dashboard from "./pages/Dashboard";
 import Trashemon from "./pages/Trashemon";
 import Report from "./pages/Report";
 import Leaderboard from "./pages/Leaderboard";
+import Chatbot from "./pages/Chatbot";
+import Environment from "./pages/Environment";
+import Machines from "./pages/Machines";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,22 +31,12 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
-              <Route
-                path="/trashemon"
-                element={
-                  <ProtectedRoute>
-                    <Trashemon />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/report"
-                element={
-                  <ProtectedRoute>
-                    <Report />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/trashemon" element={<ProtectedRoute><Trashemon /></ProtectedRoute>} />
+              <Route path="/report" element={<ProtectedRoute><Report /></ProtectedRoute>} />
+              <Route path="/chatbot" element={<ProtectedRoute><Chatbot /></ProtectedRoute>} />
+              <Route path="/environment" element={<ProtectedRoute><Environment /></ProtectedRoute>} />
+              <Route path="/machines" element={<ProtectedRoute><Machines /></ProtectedRoute>} />
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
