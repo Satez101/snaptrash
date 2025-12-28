@@ -1,13 +1,18 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Leaf, User, Trophy, Menu, X } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Leaf, User, Trophy, Menu, X, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
-  const ecoCredits = 0; // Will be connected to state later
+  const navigate = useNavigate();
+  const { user, profile, signOut } = useAuth();
+
+  const ecoCredits = profile?.eco_creds || 0;
 
   const navLinks = [
     { href: "/", label: "Home" },
@@ -15,6 +20,12 @@ const Navbar = () => {
     { href: "/report", label: "Report" },
     { href: "/leaderboard", label: "Leaderboard" },
   ];
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("Signed out successfully");
+    navigate("/");
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 px-4 py-3">
@@ -52,16 +63,34 @@ const Navbar = () => {
           {/* Right Section */}
           <div className="flex items-center gap-3">
             {/* EcoCredits Badge */}
-            <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-muted/50 border border-border/50">
-              <Trophy className="w-4 h-4 text-warning" />
-              <span className="text-sm font-semibold text-warning">{ecoCredits}</span>
-            </div>
+            {user && (
+              <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-muted/50 border border-border/50">
+                <Trophy className="w-4 h-4 text-warning" />
+                <span className="text-sm font-semibold text-warning">{ecoCredits}</span>
+              </div>
+            )}
 
-            {/* Profile Button */}
-            <Button variant="glass" size="sm" className="gap-2">
-              <User className="w-4 h-4" />
-              <span className="hidden sm:inline">Login</span>
-            </Button>
+            {/* Auth Button */}
+            {user ? (
+              <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium truncate max-w-[100px]">
+                    {profile?.name || 'User'}
+                  </span>
+                </div>
+                <Button variant="ghost" size="icon" onClick={handleSignOut}>
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <Link to="/auth">
+                <Button variant="glass" size="sm" className="gap-2">
+                  <User className="w-4 h-4" />
+                  <span className="hidden sm:inline">Login</span>
+                </Button>
+              </Link>
+            )}
 
             {/* Mobile Menu Button */}
             <Button
@@ -94,6 +123,14 @@ const Navbar = () => {
                   {link.label}
                 </Link>
               ))}
+              {user && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-border/50 mt-2 pt-4">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-warning" />
+                    <span className="text-sm font-semibold text-warning">{ecoCredits} EcoCreds</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

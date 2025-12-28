@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -15,14 +15,40 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+
+interface LocationCoords {
+  latitude: number;
+  longitude: number;
+}
 
 const Report = () => {
+  const { profile, refreshProfile } = useAuth();
   const [image, setImage] = useState<string | null>(null);
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [coords, setCoords] = useState<LocationCoords | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Try to get location on mount
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCoords({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        },
+        () => {
+          // Location denied, continue without it
+        }
+      );
+    }
+  }, []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -49,9 +75,35 @@ const Report = () => {
     }
 
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsSubmitting(false);
-    setIsSubmitted(true);
+
+    try {
+      const { error } = await supabase
+        .from('reports')
+        .insert({
+          user_id: profile?.user_id,
+          location: location.trim(),
+          description: description.trim() || null,
+          latitude: coords?.latitude,
+          longitude: coords?.longitude,
+          eco_creds_earned: 20,
+        });
+
+      if (error) {
+        console.error('Error submitting report:', error);
+        toast.error('Failed to submit report. Please try again.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      await refreshProfile();
+      setIsSubmitted(true);
+      toast.success('+20 EcoCreds earned!');
+    } catch (err) {
+      console.error('Error:', err);
+      toast.error('An error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {

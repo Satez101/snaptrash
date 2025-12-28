@@ -1,24 +1,52 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Trophy, Medal, Crown, TrendingUp, Leaf } from "lucide-react";
+import { ArrowLeft, Trophy, Medal, Crown, TrendingUp, Leaf, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+
+interface LeaderboardUser {
+  id: string;
+  name: string;
+  eco_creds: number;
+  total_scans: number;
+}
 
 const Leaderboard = () => {
-  // Demo leaderboard data
-  const leaderboardData = [
-    { rank: 1, name: "Arjun Sharma", ecoCredits: 2840, scans: 284, avatar: "A" },
-    { rank: 2, name: "Priya Patel", ecoCredits: 2650, scans: 265, avatar: "P" },
-    { rank: 3, name: "Rahul Verma", ecoCredits: 2420, scans: 242, avatar: "R" },
-    { rank: 4, name: "Sneha Gupta", ecoCredits: 2180, scans: 218, avatar: "S" },
-    { rank: 5, name: "Vikram Singh", ecoCredits: 1950, scans: 195, avatar: "V" },
-    { rank: 6, name: "Ananya Reddy", ecoCredits: 1780, scans: 178, avatar: "A" },
-    { rank: 7, name: "Karan Mehta", ecoCredits: 1620, scans: 162, avatar: "K" },
-    { rank: 8, name: "Divya Nair", ecoCredits: 1450, scans: 145, avatar: "D" },
-    { rank: 9, name: "Amit Kumar", ecoCredits: 1280, scans: 128, avatar: "A" },
-    { rank: 10, name: "Riya Shah", ecoCredits: 1150, scans: 115, avatar: "R" },
-  ];
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, name, eco_creds, total_scans')
+        .order('eco_creds', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error('Error fetching leaderboard:', error);
+      } else {
+        setLeaderboardData(data || []);
+      }
+      setLoading(false);
+    };
+
+    fetchLeaderboard();
+  }, []);
 
   const topThree = leaderboardData.slice(0, 3);
   const rest = leaderboardData.slice(3);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-12 h-12 text-primary animate-spin" />
+          <p className="text-muted-foreground">Loading leaderboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pt-24 pb-16 px-4">
@@ -45,61 +73,85 @@ const Leaderboard = () => {
           </p>
         </div>
 
-        {/* Podium - Top 3 */}
-        <div className="grid grid-cols-3 gap-4 mb-8 h-64 items-end animate-fade-in" style={{ animationDelay: '0.1s' }}>
-          {/* 2nd Place */}
-          <div className="flex flex-col items-center">
-            <PodiumCard
-              rank={2}
-              name={topThree[1].name}
-              ecoCredits={topThree[1].ecoCredits}
-              avatar={topThree[1].avatar}
-              height="h-40"
-            />
+        {leaderboardData.length === 0 ? (
+          <div className="glass-card p-12 text-center animate-fade-in">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-6">
+              <Leaf className="w-8 h-8 text-primary" />
+            </div>
+            <h3 className="font-display text-2xl font-bold mb-2">Be the First Champion! 🌱</h3>
+            <p className="text-muted-foreground mb-6">
+              No eco-warriors on the leaderboard yet. Start scanning to claim the top spot!
+            </p>
+            <Link to="/trashemon">
+              <button className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-primary text-primary-foreground font-semibold hover:shadow-[0_0_30px_hsl(var(--primary)/0.5)] transition-all duration-300 hover:-translate-y-0.5">
+                <Leaf className="w-5 h-5" />
+                Start Scanning
+              </button>
+            </Link>
           </div>
+        ) : (
+          <>
+            {/* Podium - Top 3 */}
+            {topThree.length >= 3 && (
+              <div className="grid grid-cols-3 gap-4 mb-8 h-64 items-end animate-fade-in" style={{ animationDelay: '0.1s' }}>
+                {/* 2nd Place */}
+                <div className="flex flex-col items-center">
+                  <PodiumCard
+                    rank={2}
+                    name={topThree[1].name}
+                    ecoCredits={topThree[1].eco_creds}
+                    height="h-40"
+                  />
+                </div>
 
-          {/* 1st Place */}
-          <div className="flex flex-col items-center">
-            <PodiumCard
-              rank={1}
-              name={topThree[0].name}
-              ecoCredits={topThree[0].ecoCredits}
-              avatar={topThree[0].avatar}
-              height="h-52"
-              isFirst
-            />
-          </div>
+                {/* 1st Place */}
+                <div className="flex flex-col items-center">
+                  <PodiumCard
+                    rank={1}
+                    name={topThree[0].name}
+                    ecoCredits={topThree[0].eco_creds}
+                    height="h-52"
+                    isFirst
+                  />
+                </div>
 
-          {/* 3rd Place */}
-          <div className="flex flex-col items-center">
-            <PodiumCard
-              rank={3}
-              name={topThree[2].name}
-              ecoCredits={topThree[2].ecoCredits}
-              avatar={topThree[2].avatar}
-              height="h-32"
-            />
-          </div>
-        </div>
+                {/* 3rd Place */}
+                <div className="flex flex-col items-center">
+                  <PodiumCard
+                    rank={3}
+                    name={topThree[2].name}
+                    ecoCredits={topThree[2].eco_creds}
+                    height="h-32"
+                  />
+                </div>
+              </div>
+            )}
 
-        {/* Rest of Leaderboard */}
-        <div className="glass-card overflow-hidden animate-fade-in" style={{ animationDelay: '0.2s' }}>
-          <div className="p-4 border-b border-border/50">
-            <h3 className="font-semibold flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-primary" />
-              Rankings
-            </h3>
-          </div>
-          <div className="divide-y divide-border/30">
-            {rest.map((user, index) => (
-              <LeaderboardRow
-                key={user.rank}
-                {...user}
-                index={index}
-              />
-            ))}
-          </div>
-        </div>
+            {/* Rest of Leaderboard */}
+            {rest.length > 0 && (
+              <div className="glass-card overflow-hidden animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                <div className="p-4 border-b border-border/50">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    Rankings
+                  </h3>
+                </div>
+                <div className="divide-y divide-border/30">
+                  {rest.map((user, index) => (
+                    <LeaderboardRow
+                      key={user.id}
+                      rank={index + 4}
+                      name={user.name}
+                      ecoCredits={user.eco_creds}
+                      scans={user.total_scans}
+                      index={index}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
 
         {/* Motivational Footer */}
         <div className="text-center mt-12 animate-fade-in" style={{ animationDelay: '0.3s' }}>
@@ -122,14 +174,12 @@ const PodiumCard = ({
   rank,
   name,
   ecoCredits,
-  avatar,
   height,
   isFirst = false,
 }: {
   rank: number;
   name: string;
   ecoCredits: number;
-  avatar: string;
   height: string;
   isFirst?: boolean;
 }) => {
@@ -158,6 +208,8 @@ const PodiumCard = ({
     }
   };
 
+  const getAvatar = () => name.charAt(0).toUpperCase();
+
   return (
     <div
       className={cn(
@@ -177,7 +229,7 @@ const PodiumCard = ({
             : "bg-gradient-to-br from-amber-500 to-amber-700 text-amber-100"
         )}
       >
-        {avatar}
+        {getAvatar()}
       </div>
 
       {/* Name */}
@@ -205,16 +257,16 @@ const LeaderboardRow = ({
   name,
   ecoCredits,
   scans,
-  avatar,
   index,
 }: {
   rank: number;
   name: string;
   ecoCredits: number;
   scans: number;
-  avatar: string;
   index: number;
 }) => {
+  const getAvatar = () => name.charAt(0).toUpperCase();
+
   return (
     <div
       className="flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors"
@@ -227,7 +279,7 @@ const LeaderboardRow = ({
 
       {/* Avatar */}
       <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center text-sm font-bold text-primary-foreground">
-        {avatar}
+        {getAvatar()}
       </div>
 
       {/* Info */}
