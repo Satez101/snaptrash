@@ -25,6 +25,7 @@ import AQIStoryCard from "@/components/environment/AQIStoryCard";
 import IndustryStoryCard from "@/components/environment/IndustryStoryCard";
 import WaterBodyStoryCard from "@/components/environment/WaterBodyStoryCard";
 import SolutionsStoryCard from "@/components/environment/SolutionsStoryCard";
+import LocationLoader from "@/components/environment/LocationLoader";
 
 interface SearchResult {
   name: string;
@@ -112,6 +113,8 @@ const getHealthAdvice = (aqi: number) => {
 
 const Environment = () => {
   const [loading, setLoading] = useState(true);
+  const [locationStatus, setLocationStatus] = useState<"requesting" | "detecting" | "refining">("requesting");
+  const [currentAccuracy, setCurrentAccuracy] = useState<number | undefined>(undefined);
   const [data, setData] = useState<EnvironmentData | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -121,6 +124,8 @@ const Environment = () => {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const bestAccuracyRef = useRef<number>(Infinity);
 
   const searchLocation = async (query: string) => {
     if (query.length < 2) {
@@ -179,9 +184,18 @@ const Environment = () => {
 
   const cardTitles = ["Air Quality", "Industrial Impact", "Water Bodies", "Solutions"];
 
+  const stopWatching = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+  }, []);
+
   const requestLocationPermission = useCallback(async () => {
     setLoading(true);
     setLocationError(null);
+    setLocationStatus("requesting");
+    bestAccuracyRef.current = Infinity;
 
     if (!navigator.geolocation) {
       setLocationError("Geolocation is not supported by your browser");
@@ -189,35 +203,35 @@ const Environment = () => {
       return;
     }
 
-    const getPosition = (highAccuracy: boolean): Promise<GeolocationPosition> => {
-      return new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: highAccuracy,
-          timeout: 15000,
-          maximumAge: 0,
-        });
-      });
+    stopWatching();
+
+    const handlePosition = async (position: GeolocationPosition, isInitial: boolean) => {
+      const { latitude, longitude, accuracy } = position.coords;
+      setCurrentAccuracy(accuracy);
+
+      // Only update if accuracy improved significantly (by at least 30%)
+      const shouldUpdate = accuracy < bestAccuracyRef.current * 0.7 || isInitial;
+      
+      if (shouldUpdate) {
+        bestAccuracyRef.current = accuracy;
+        setCoords({ lat: latitude, lng: longitude });
+        
+        if (!isInitial) {
+          setLocationStatus("refining");
+        }
+        
+        await fetchEnvironmentData(latitude, longitude);
+      }
+
+      // Stop watching once we have good accuracy or after enough time
+      if (accuracy <= 50) {
+        stopWatching();
+        setLoading(false);
+      }
     };
 
-    try {
-      let position: GeolocationPosition;
-      try {
-        position = await getPosition(true);
-      } catch {
-        // Simple fallback to network location
-        position = await getPosition(false);
-      }
-
-      const { latitude, longitude, accuracy } = position.coords;
-      setCoords({ lat: latitude, lng: longitude });
-
-      if (accuracy > 500) {
-        toast.info("GPS seems inaccurate here — use the city search for best results.", { duration: 3500 });
-      }
-
-      await fetchEnvironmentData(latitude, longitude);
-      setLoading(false);
-    } catch (error: any) {
+    const handleError = (error: GeolocationPositionError) => {
+      stopWatching();
       let message = "Unable to get your location";
       if (error.code === 1) {
         message = "Location permission denied. Please enable location access in your browser settings.";
@@ -229,8 +243,68 @@ const Environment = () => {
       setLocationError(message);
       toast.error(message);
       setLoading(false);
+    };
+
+    try {
+      setLocationStatus("detecting");
+      
+      // Get initial position quickly
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          await handlePosition(position, true);
+          
+          const initialAccuracy = position.coords.accuracy;
+          
+          // If accuracy is poor, start watching for improvements
+          if (initialAccuracy > 100) {
+            setLocationStatus("refining");
+            
+            watchIdRef.current = navigator.geolocation.watchPosition(
+              async (pos) => {
+                await handlePosition(pos, false);
+              },
+              (err) => {
+                console.log("Watch error:", err);
+                // Don't treat watch errors as fatal if we already have a position
+                if (coords) {
+                  stopWatching();
+                  setLoading(false);
+                }
+              },
+              {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 20000,
+              }
+            );
+
+            // Stop watching after 15 seconds regardless
+            setTimeout(() => {
+              if (watchIdRef.current !== null) {
+                stopWatching();
+                setLoading(false);
+                if (bestAccuracyRef.current > 500) {
+                  toast.info("GPS accuracy is limited. Use city search for better results.", { duration: 4000 });
+                }
+              }
+            }, 15000);
+          } else {
+            setLoading(false);
+          }
+        },
+        handleError,
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      );
+    } catch (error) {
+      console.error("Location error:", error);
+      setLocationError("An unexpected error occurred while getting your location.");
+      setLoading(false);
     }
-  }, []);
+  }, [stopWatching, coords]);
 
   const fetchEnvironmentData = async (lat: number, lng: number) => {
     try {
@@ -285,7 +359,10 @@ const Environment = () => {
 
   useEffect(() => {
     requestLocationPermission();
-  }, [requestLocationPermission]);
+    return () => {
+      stopWatching();
+    };
+  }, [requestLocationPermission, stopWatching]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -298,20 +375,7 @@ const Environment = () => {
   }, [currentCardIndex]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center max-w-sm mx-auto px-4">
-          <div className="relative mb-6">
-            <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
-              <Navigation className="w-10 h-10 text-primary animate-pulse" />
-            </div>
-            <Loader2 className="w-24 h-24 animate-spin text-primary/30 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-          </div>
-          <h2 className="text-xl font-semibold text-foreground mb-2">Getting Your Location</h2>
-          <p className="text-muted-foreground text-sm">Please allow location access for accurate environmental data</p>
-        </div>
-      </div>
-    );
+    return <LocationLoader status={locationStatus} accuracy={currentAccuracy} />;
   }
 
   if (locationError || !data) {
