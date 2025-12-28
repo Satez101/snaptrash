@@ -6,69 +6,91 @@
 
 @layer base {
   :root {
-    --background: 220 20% 7%;
-    --foreground: 180 10% 95%;
+    --background: 160 30% 4%;
+    --foreground: 150 20% 95%;
 
-    --card: 220 20% 10%;
-    --card-foreground: 180 10% 95%;
+    --card: 160 25% 8%;
+    --card-foreground: 150 20% 95%;
 
-    --popover: 220 20% 10%;
-    --popover-foreground: 180 10% 95%;
+    --popover: 160 25% 8%;
+    --popover-foreground: 150 20% 95%;
 
-    --primary: 174 72% 45%;
-    --primary-foreground: 220 20% 7%;
+    --primary: 152 72% 45%;
+    --primary-foreground: 160 30% 4%;
 
-    --secondary: 200 80% 50%;
-    --secondary-foreground: 220 20% 7%;
+    --secondary: 180 65% 42%;
+    --secondary-foreground: 160 30% 4%;
 
-    --muted: 220 15% 15%;
-    --muted-foreground: 220 10% 60%;
+    --muted: 160 20% 12%;
+    --muted-foreground: 160 15% 55%;
 
-    --accent: 142 80% 55%;
-    --accent-foreground: 220 20% 7%;
+    --accent: 120 65% 50%;
+    --accent-foreground: 160 30% 4%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --warning: 30 95% 60%;
-    --warning-foreground: 220 20% 7%;
+    --warning: 38 95% 55%;
+    --warning-foreground: 160 30% 4%;
 
-    --border: 220 15% 18%;
-    --input: 220 15% 18%;
-    --ring: 174 72% 45%;
+    --border: 160 20% 15%;
+    --input: 160 20% 15%;
+    --ring: 152 72% 45%;
 
     --radius: 1.25rem;
 
-    /* Custom Ecoza tokens */
-    --glow-primary: 174 72% 45%;
-    --glow-accent: 142 80% 55%;
-    --glow-warning: 30 95% 60%;
-    
-    --glass-bg: 220 20% 12% / 0.6;
-    --glass-border: 220 15% 25% / 0.3;
-    
-    --gradient-primary: linear-gradient(135deg, hsl(174 72% 45%), hsl(200 80% 50%));
-    --gradient-accent: linear-gradient(135deg, hsl(142 80% 55%), hsl(174 72% 45%));
-    --gradient-warm: linear-gradient(135deg, hsl(45 95% 55%), hsl(30 95% 60%));
-    --gradient-hero: linear-gradient(180deg, hsl(220 20% 7%), hsl(220 25% 12%));
-    
-    --shadow-glow: 0 0 40px hsl(174 72% 45% / 0.3);
-    --shadow-glow-accent: 0 0 40px hsl(142 80% 55% / 0.3);
-    --shadow-card: 0 8px 32px hsl(0 0% 0% / 0.4);
+    /* AQI Color Scale */
+    --aqi-good: 142 76% 36%;
+    --aqi-moderate: 48 96% 53%;
+    --aqi-unhealthy-sensitive: 28 96% 50%;
+    --aqi-unhealthy: 0 84% 60%;
+    --aqi-very-unhealthy: 280 70% 45%;
+    --aqi-hazardous: 340 82% 40%;
 
-    --sidebar-background: 220 20% 7%;
-    --sidebar-foreground: 180 10% 95%;
-    --sidebar-primary: 174 72% 45%;
-    --sidebar-primary-foreground: 220 20% 7%;
-    --sidebar-accent: 220 15% 15%;
-    --sidebar-accent-foreground: 180 10% 95%;
-    --sidebar-border: 220 15% 18%;
-    --sidebar-ring: 174 72% 45%;
+    /* Environmental tokens */
+    --eco-leaf: 142 76% 36%;
+    --eco-water: 195 85% 50%;
+    --eco-solar: 45 100% 55%;
+    --eco-earth: 28 65% 45%;
+    --eco-air: 200 90% 75%;
+    
+    /* Confidence levels */
+    --confidence-high: 142 76% 45%;
+    --confidence-medium: 48 96% 53%;
+    --confidence-low: 0 84% 60%;
+
+    /* Custom Ecoza tokens */
+    --glow-primary: 152 72% 45%;
+    --glow-accent: 120 65% 50%;
+    --glow-warning: 38 95% 55%;
+    
+    --glass-bg: 160 25% 10% / 0.7;
+    --glass-border: 160 20% 25% / 0.3;
+    
+    --gradient-primary: linear-gradient(135deg, hsl(152 72% 45%), hsl(180 65% 42%));
+    --gradient-accent: linear-gradient(135deg, hsl(120 65% 50%), hsl(152 72% 45%));
+    --gradient-warm: linear-gradient(135deg, hsl(48 96% 55%), hsl(38 95% 55%));
+    --gradient-hero: linear-gradient(180deg, hsl(160 30% 4%), hsl(160 25% 8%));
+    --gradient-eco: linear-gradient(135deg, hsl(152 72% 45%), hsl(120 65% 50%), hsl(180 65% 42%));
+    
+    --shadow-glow: 0 0 40px hsl(152 72% 45% / 0.25);
+    --shadow-glow-accent: 0 0 40px hsl(120 65% 50% / 0.25);
+    --shadow-card: 0 8px 32px hsl(0 0% 0% / 0.5);
+    --shadow-elevated: 0 16px 48px hsl(0 0% 0% / 0.6);
+
+    --sidebar-background: 160 30% 4%;
+    --sidebar-foreground: 150 20% 95%;
+    --sidebar-primary: 152 72% 45%;
+    --sidebar-primary-foreground: 160 30% 4%;
+    --sidebar-accent: 160 20% 12%;
+    --sidebar-accent-foreground: 150 20% 95%;
+    --sidebar-border: 160 20% 15%;
+    --sidebar-ring: 152 72% 45%;
   }
 
   .dark {
-    --background: 220 20% 7%;
-    --foreground: 180 10% 95%;
+    --background: 160 30% 4%;
+    --foreground: 150 20% 95%;
   }
 }
 
@@ -89,17 +111,21 @@
 
 @layer components {
   .glass-card {
-    @apply bg-card/60 backdrop-blur-xl border border-border/30 rounded-2xl;
+    @apply bg-card/70 backdrop-blur-xl border border-border/40 rounded-2xl;
     box-shadow: var(--shadow-card);
   }
 
   .glass-card-hover {
-    @apply glass-card transition-all duration-300 ease-out;
+    @apply glass-card transition-all duration-300 ease-out cursor-pointer;
   }
 
   .glass-card-hover:hover {
-    @apply -translate-y-1 border-primary/30;
+    @apply -translate-y-1 border-primary/40;
     box-shadow: var(--shadow-glow), var(--shadow-card);
+  }
+
+  .glass-input {
+    @apply bg-muted/50 backdrop-blur-sm border border-border/50 rounded-xl;
   }
 
   .glow-primary {
@@ -125,6 +151,11 @@
     background-image: var(--gradient-warm);
   }
 
+  .gradient-text-eco {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-eco);
+  }
+
   .btn-gradient {
     background-image: var(--gradient-primary);
     @apply text-primary-foreground font-semibold;
@@ -135,12 +166,64 @@
     @apply text-warning-foreground font-semibold;
   }
 
+  .btn-gradient-eco {
+    background-image: var(--gradient-eco);
+    @apply text-primary-foreground font-semibold;
+  }
+
   .icon-float {
     animation: float 3s ease-in-out infinite;
   }
 
   .icon-pulse {
     animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  /* AQI Badge Styles */
+  .aqi-good {
+    @apply bg-[hsl(var(--aqi-good))] text-primary-foreground;
+  }
+
+  .aqi-moderate {
+    @apply bg-[hsl(var(--aqi-moderate))] text-primary-foreground;
+  }
+
+  .aqi-unhealthy-sensitive {
+    @apply bg-[hsl(var(--aqi-unhealthy-sensitive))] text-primary-foreground;
+  }
+
+  .aqi-unhealthy {
+    @apply bg-[hsl(var(--aqi-unhealthy))] text-destructive-foreground;
+  }
+
+  .aqi-very-unhealthy {
+    @apply bg-[hsl(var(--aqi-very-unhealthy))] text-destructive-foreground;
+  }
+
+  .aqi-hazardous {
+    @apply bg-[hsl(var(--aqi-hazardous))] text-destructive-foreground;
+  }
+
+  /* Confidence badges */
+  .confidence-high {
+    @apply bg-[hsl(var(--confidence-high)/0.2)] text-[hsl(var(--confidence-high))] border border-[hsl(var(--confidence-high)/0.3)];
+  }
+
+  .confidence-medium {
+    @apply bg-[hsl(var(--confidence-medium)/0.2)] text-[hsl(var(--confidence-medium))] border border-[hsl(var(--confidence-medium)/0.3)];
+  }
+
+  .confidence-low {
+    @apply bg-[hsl(var(--confidence-low)/0.2)] text-[hsl(var(--confidence-low))] border border-[hsl(var(--confidence-low)/0.3)];
+  }
+
+  /* Dashboard card */
+  .dashboard-card {
+    @apply glass-card-hover p-6 flex flex-col items-center gap-4 text-center;
+  }
+
+  .dashboard-icon {
+    @apply w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-300;
   }
 }
 
@@ -161,6 +244,8 @@
   .stagger-2 { animation-delay: 0.2s; }
   .stagger-3 { animation-delay: 0.3s; }
   .stagger-4 { animation-delay: 0.4s; }
+  .stagger-5 { animation-delay: 0.5s; }
+  .stagger-6 { animation-delay: 0.6s; }
 }
 
 @keyframes fade-in {
@@ -208,11 +293,11 @@
 @keyframes pulse-glow {
   0%, 100% {
     opacity: 1;
-    filter: drop-shadow(0 0 8px hsl(174 72% 45% / 0.5));
+    filter: drop-shadow(0 0 8px hsl(152 72% 45% / 0.5));
   }
   50% {
     opacity: 0.8;
-    filter: drop-shadow(0 0 20px hsl(174 72% 45% / 0.8));
+    filter: drop-shadow(0 0 20px hsl(152 72% 45% / 0.8));
   }
 }
 
@@ -225,6 +310,28 @@
   }
 }
 
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
 .shimmer {
   background: linear-gradient(
     90deg,
@@ -234,4 +341,12 @@
   );
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
+}
+
+.breathe {
+  animation: breathe 4s ease-in-out infinite;
+}
+
+.ripple {
+  animation: ripple 2s ease-out infinite;
 }
