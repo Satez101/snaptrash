@@ -14,10 +14,13 @@ const Navbar = () => {
 
   const ecoCredits = profile?.eco_creds || 0;
 
-  const navLinks = [
+  const navLinks = user ? [
+    { href: "/dashboard", label: "Dashboard" },
+    { href: "/trashemon", label: "Scanner" },
+    { href: "/environment", label: "Environment" },
+    { href: "/leaderboard", label: "Leaderboard" },
+  ] : [
     { href: "/", label: "Home" },
-    { href: "/trashemon", label: "Trashemon" },
-    { href: "/report", label: "Report" },
     { href: "/leaderboard", label: "Leaderboard" },
   ];
 
