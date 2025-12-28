@@ -5,7 +5,7 @@ import {
   MapPin, 
   Wind, 
   MessageCircle, 
-  Leaf,
+  Trash2,
   Sparkles,
   ArrowRight
 } from "lucide-react";
@@ -53,13 +53,13 @@ const Dashboard = () => {
       <div className="max-w-6xl mx-auto mb-12">
         <div className="text-center mb-8 opacity-0 animate-fade-in">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
-            <Leaf className="w-4 h-4 text-primary" />
+            <Trash2 className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium text-primary">
               Welcome back, {profile?.name || 'Eco Warrior'}
             </span>
           </div>
           <h1 className="font-display text-4xl md:text-5xl font-bold mb-4">
-            <span className="gradient-text-eco">Ecoza Dashboard</span>
+            <span className="gradient-text-eco">SnapTrash Dashboard</span>
           </h1>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
             Your hub for environmental action. Choose how you want to make an impact today.
@@ -71,7 +71,7 @@ const Dashboard = () => {
           <div className="glass-card p-6 grid grid-cols-3 gap-4 mb-8 opacity-0 animate-slide-up" style={{ animationDelay: '0.1s' }}>
             <div className="text-center">
               <div className="font-display text-2xl font-bold text-warning">{profile.eco_creds}</div>
-              <div className="text-xs text-muted-foreground">EcoCreds</div>
+              <div className="text-xs text-muted-foreground">SnapCreds</div>
             </div>
             <div className="text-center border-x border-border/50">
               <div className="font-display text-2xl font-bold text-primary">{profile.total_scans}</div>
@@ -90,12 +90,12 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Waste Scanner */}
           <DashboardCard
-            to="/trashemon"
+            to="/scanner"
             icon={<Camera className="w-8 h-8 text-primary" />}
             iconBg="bg-primary/10"
             title="AI Waste Scanner"
             subtitle="Scan & identify waste with AI"
-            badge="+10 EcoCreds"
+            badge="+10 SnapCreds"
             badgeColor="bg-primary/10 text-primary"
             delay="0.2s"
           />
@@ -118,7 +118,7 @@ const Dashboard = () => {
             icon={<MapPin className="w-8 h-8 text-accent" />}
             iconBg="bg-accent/10"
             title="Disposal Machines"
-            subtitle="Find nearby Ecoza machines"
+            subtitle="Find nearby SnapTrash machines"
             badge="Near You"
             badgeColor="bg-accent/10 text-accent"
             delay="0.3s"
@@ -136,12 +136,12 @@ const Dashboard = () => {
             delay="0.35s"
           />
 
-          {/* Ecoza Expert Chatbot */}
+          {/* SnapTrash Expert Chatbot */}
           <DashboardCard
             to="/chatbot"
             icon={<MessageCircle className="w-8 h-8 text-[hsl(var(--eco-water))]" />}
             iconBg="bg-[hsl(var(--eco-water)/0.1)]"
-            title="Ecoza Expert"
+            title="SnapTrash Expert"
             subtitle="Environmental AI assistant"
             badge="New"
             badgeColor="bg-[hsl(var(--eco-water)/0.1)] text-[hsl(var(--eco-water))]"
@@ -155,7 +155,7 @@ const Dashboard = () => {
             iconBg="bg-[hsl(var(--eco-earth)/0.1)]"
             title="Civic Reports"
             subtitle="Report environmental issues"
-            badge="+20 EcoCreds"
+            badge="+20 SnapCreds"
             badgeColor="bg-[hsl(var(--eco-earth)/0.1)] text-[hsl(var(--eco-earth))]"
             delay="0.45s"
           />
