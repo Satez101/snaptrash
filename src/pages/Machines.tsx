@@ -9,7 +9,8 @@ import {
   Trophy,
   CheckCircle2,
   XCircle,
-  ChevronRight
+  ChevronRight,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -84,7 +85,7 @@ const Machines = () => {
       <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Finding nearby disposal machines...</p>
+          <p className="text-muted-foreground">Finding nearby SnapTrash machines...</p>
         </div>
       </div>
     );
@@ -100,11 +101,16 @@ const Machines = () => {
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
-          <div>
-            <h1 className="font-display text-3xl font-bold gradient-text">Disposal Machines</h1>
-            <p className="text-sm text-muted-foreground">
-              {machines.length} Ecoza machines found nearby
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center">
+              <Trash2 className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="font-display text-3xl font-bold gradient-text">SnapTrash Machines</h1>
+              <p className="text-sm text-muted-foreground">
+                {machines.length} machines found nearby
+              </p>
+            </div>
           </div>
         </div>
 
@@ -197,10 +203,10 @@ const Machines = () => {
 
         {machines.length === 0 && (
           <div className="glass-card p-12 text-center">
-            <MapPin className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <Trash2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-foreground font-medium mb-2">No machines found nearby</p>
             <p className="text-sm text-muted-foreground">
-              Try expanding your search area or check back later.
+              Be the first SnapTrash champion in your area! 🌱
             </p>
           </div>
         )}

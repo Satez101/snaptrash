@@ -4,7 +4,7 @@ import {
   MapPin, 
   Sparkles, 
   ArrowRight, 
-  Leaf, 
+  Trash2, 
   Wind, 
   MessageCircle,
   Trophy
@@ -38,7 +38,7 @@ const Index = () => {
 
           {/* Main Title */}
           <h1 className="font-display text-6xl md:text-8xl font-bold mb-6 opacity-0 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-            <span className="gradient-text-eco">Ecoza</span>
+            <span className="gradient-text-eco">SnapTrash</span>
           </h1>
 
           {/* Quote */}
@@ -50,7 +50,7 @@ const Index = () => {
 
           {/* Supporting Text */}
           <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-6 opacity-0 animate-slide-up" style={{ animationDelay: '0.3s' }}>
-            How do you want to save the Earth today?
+            Scan waste. Earn rewards. Save the planet.
           </p>
 
           {/* CTA Button */}
@@ -70,7 +70,7 @@ const Index = () => {
         <section className="px-4 py-8">
           <div className="max-w-5xl mx-auto">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 opacity-0 animate-slide-up" style={{ animationDelay: '0.5s' }}>
-              <QuickAccessCard to="/trashemon" icon={<Camera className="w-6 h-6" />} label="Scan Waste" color="primary" />
+              <QuickAccessCard to="/scanner" icon={<Camera className="w-6 h-6" />} label="Scan Waste" color="primary" />
               <QuickAccessCard to="/environment" icon={<Wind className="w-6 h-6" />} label="Environment" color="secondary" />
               <QuickAccessCard to="/chatbot" icon={<MessageCircle className="w-6 h-6" />} label="Ask Expert" color="accent" />
               <QuickAccessCard to="/machines" icon={<MapPin className="w-6 h-6" />} label="Find Machines" color="warning" />
@@ -83,13 +83,13 @@ const Index = () => {
       <section className="px-4 py-12">
         <div className="max-w-5xl mx-auto">
           <div className="grid md:grid-cols-2 gap-6 opacity-0 animate-slide-up" style={{ animationDelay: '0.5s' }}>
-            {/* Trashemon Card */}
+            {/* Scanner Card */}
             <FeatureCard
-              to="/trashemon"
+              to="/scanner"
               icon={<Camera className="w-7 h-7" />}
-              title="Play Trashemon"
+              title="AI Waste Scanner"
               subtitle="Scan. Learn. Act."
-              description="Scan waste items with AI, learn proper disposal methods, earn EcoCreds, and climb the leaderboard!"
+              description="Scan any waste item with AI, get instant disposal guidance, earn SnapCreds, and find nearby disposal machines!"
               points={10}
               variant="primary"
             />

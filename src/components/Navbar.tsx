@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Leaf, User, Trophy, Menu, X, LogOut } from "lucide-react";
+import { Trash2, User, Trophy, Menu, X, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,7 +16,7 @@ const Navbar = () => {
 
   const navLinks = user ? [
     { href: "/dashboard", label: "Dashboard" },
-    { href: "/trashemon", label: "Scanner" },
+    { href: "/scanner", label: "Scanner" },
     { href: "/environment", label: "Environment" },
     { href: "/leaderboard", label: "Leaderboard" },
   ] : [
@@ -37,11 +37,11 @@ const Navbar = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
             <div className="relative w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center group-hover:shadow-[0_0_20px_hsl(var(--primary)/0.5)] transition-all duration-300">
-              <Leaf className="w-5 h-5 text-primary-foreground animate-pulse-glow" />
+              <Trash2 className="w-5 h-5 text-primary-foreground" />
               <div className="absolute inset-0 rounded-xl bg-gradient-primary opacity-0 group-hover:opacity-50 blur-xl transition-opacity duration-300" />
             </div>
             <span className="font-display font-bold text-xl gradient-text">
-              Ecoza
+              SnapTrash
             </span>
           </Link>
 
@@ -130,7 +130,7 @@ const Navbar = () => {
                 <div className="flex items-center justify-between px-4 py-3 border-t border-border/50 mt-2 pt-4">
                   <div className="flex items-center gap-2">
                     <Trophy className="w-4 h-4 text-warning" />
-                    <span className="text-sm font-semibold text-warning">{ecoCredits} EcoCreds</span>
+                    <span className="text-sm font-semibold text-warning">{ecoCredits} SnapCreds</span>
                   </div>
                 </div>
               )}

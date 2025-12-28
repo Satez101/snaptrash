@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.ecoza-chat]
 verify_jwt = false
 
+[functions.snaptrash-chat]
+verify_jwt = false
+
 [functions.environment-data]
 verify_jwt = false
 

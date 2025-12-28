@@ -9,7 +9,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import Trashemon from "./pages/Trashemon";
+import Scanner from "./pages/Scanner";
 import Report from "./pages/Report";
 import Leaderboard from "./pages/Leaderboard";
 import Chatbot from "./pages/Chatbot";
@@ -32,7 +32,8 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/trashemon" element={<ProtectedRoute><Trashemon /></ProtectedRoute>} />
+              <Route path="/scanner" element={<ProtectedRoute><Scanner /></ProtectedRoute>} />
+              <Route path="/trashemon" element={<ProtectedRoute><Scanner /></ProtectedRoute>} />
               <Route path="/report" element={<ProtectedRoute><Report /></ProtectedRoute>} />
               <Route path="/chatbot" element={<ProtectedRoute><Chatbot /></ProtectedRoute>} />
               <Route path="/environment" element={<ProtectedRoute><Environment /></ProtectedRoute>} />

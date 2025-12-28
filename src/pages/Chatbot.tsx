@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { 
   MessageCircle, 
   Send, 
-  Leaf, 
+  Trash2, 
   Loader2,
   Recycle,
   Wind,
@@ -60,7 +60,7 @@ const Chatbot = () => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("ecoza-chat", {
+      const { data, error } = await supabase.functions.invoke("snaptrash-chat", {
         body: { 
           message: text.trim(),
           history: messages.slice(-10).map(m => ({ role: m.role, content: m.content }))
@@ -102,10 +102,10 @@ const Chatbot = () => {
           </Link>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-              <Leaf className="w-6 h-6 text-primary-foreground" />
+              <Trash2 className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-display font-bold text-xl">Ecoza Expert</h1>
+              <h1 className="font-display font-bold text-xl">SnapTrash Expert</h1>
               <p className="text-sm text-muted-foreground">Your environmental AI assistant</p>
             </div>
           </div>
@@ -161,7 +161,7 @@ const Chatbot = () => {
                     {message.role === "assistant" && (
                       <div className="flex items-center gap-2 mb-2">
                         <Sparkles className="w-4 h-4 text-primary" />
-                        <span className="text-xs font-medium text-primary">Ecoza Expert</span>
+                        <span className="text-xs font-medium text-primary">SnapTrash Expert</span>
                       </div>
                     )}
                     <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
