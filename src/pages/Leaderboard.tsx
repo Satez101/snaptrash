@@ -75,11 +75,11 @@ const Leaderboard = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-6">
               <Leaf className="w-8 h-8 text-primary" />
             </div>
-            <h3 className="font-display text-2xl font-bold mb-2">Be the First Champion! 🌱</h3>
+            <h3 className="font-display text-2xl font-bold mb-2">Be the First SnapTrash Champion! 🌱</h3>
             <p className="text-muted-foreground mb-6">
               No eco-warriors on the leaderboard yet. Start scanning to claim the top spot!
             </p>
-            <Link to="/trashemon">
+            <Link to="/scanner">
               <button className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-primary text-primary-foreground font-semibold hover:shadow-[0_0_30px_hsl(var(--primary)/0.5)] transition-all duration-300 hover:-translate-y-0.5">
                 <Leaf className="w-5 h-5" />
                 Start Scanning
@@ -155,7 +155,7 @@ const Leaderboard = () => {
           <p className="text-muted-foreground mb-4">
             Keep scanning, keep climbing, keep saving the planet!
           </p>
-          <Link to="/trashemon">
+          <Link to="/scanner">
             <button className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-primary text-primary-foreground font-semibold hover:shadow-[0_0_30px_hsl(var(--primary)/0.5)] transition-all duration-300 hover:-translate-y-0.5">
               <Leaf className="w-5 h-5" />
               Start Scanning
@@ -288,7 +288,7 @@ const LeaderboardRow = ({
       {/* Credits */}
       <div className="text-right">
         <p className="font-bold text-warning">{ecoCredits.toLocaleString()}</p>
-        <p className="text-xs text-muted-foreground">EcoCreds</p>
+        <p className="text-xs text-muted-foreground">SnapCreds</p>
       </div>
     </div>
   );
