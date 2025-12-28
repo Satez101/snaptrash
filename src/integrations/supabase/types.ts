@@ -150,20 +150,6 @@ export type Database = {
           total_reports: number | null
           total_scans: number | null
         }
-        Insert: {
-          eco_creds?: number | null
-          id?: string | null
-          name?: string | null
-          total_reports?: number | null
-          total_scans?: number | null
-        }
-        Update: {
-          eco_creds?: number | null
-          id?: string | null
-          name?: string | null
-          total_reports?: number | null
-          total_scans?: number | null
-        }
         Relationships: []
       }
     }
