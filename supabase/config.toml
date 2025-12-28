@@ -1,1 +1,4 @@
 project_id = "lrxdllwaiakbgayrzgws"
+
+[functions.analyze-trash]
+verify_jwt = false
