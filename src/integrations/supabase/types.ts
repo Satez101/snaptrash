@@ -142,7 +142,30 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      leaderboard_view: {
+        Row: {
+          eco_creds: number | null
+          id: string | null
+          name: string | null
+          total_reports: number | null
+          total_scans: number | null
+        }
+        Insert: {
+          eco_creds?: number | null
+          id?: string | null
+          name?: string | null
+          total_reports?: number | null
+          total_scans?: number | null
+        }
+        Update: {
+          eco_creds?: number | null
+          id?: string | null
+          name?: string | null
+          total_reports?: number | null
+          total_scans?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
