@@ -147,6 +147,7 @@ export type Database = {
           eco_creds: number | null
           id: string | null
           name: string | null
+          rank: number | null
           total_reports: number | null
           total_scans: number | null
         }
