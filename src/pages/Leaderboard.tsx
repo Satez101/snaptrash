@@ -17,11 +17,8 @@ const Leaderboard = () => {
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, name, eco_creds, total_scans')
-        .order('eco_creds', { ascending: false })
-        .limit(50);
+      // Use the secure function to get leaderboard data (no email/phone exposed)
+      const { data, error } = await supabase.rpc('get_leaderboard');
 
       if (error) {
         console.error('Error fetching leaderboard:', error);
