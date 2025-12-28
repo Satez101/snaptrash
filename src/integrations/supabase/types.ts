@@ -53,6 +53,44 @@ export type Database = {
         }
         Relationships: []
       }
+      redemptions: {
+        Row: {
+          created_at: string
+          id: string
+          redeemed_at: string
+          reward_id: string
+          snapcreds_spent: number
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          redeemed_at?: string
+          reward_id: string
+          snapcreds_spent: number
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          redeemed_at?: string
+          reward_id?: string
+          snapcreds_spent?: number
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "redemptions_reward_id_fkey"
+            columns: ["reward_id"]
+            isOneToOne: false
+            referencedRelation: "rewards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reports: {
         Row: {
           created_at: string
@@ -89,6 +127,48 @@ export type Database = {
           longitude?: number | null
           status?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      rewards: {
+        Row: {
+          cost: number
+          created_at: string
+          description: string
+          id: string
+          image_url: string | null
+          is_active: boolean
+          is_sold_out: boolean
+          name: string
+          stock_count: number | null
+          tier: Database["public"]["Enums"]["reward_tier"]
+          updated_at: string
+        }
+        Insert: {
+          cost: number
+          created_at?: string
+          description: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          is_sold_out?: boolean
+          name: string
+          stock_count?: number | null
+          tier: Database["public"]["Enums"]["reward_tier"]
+          updated_at?: string
+        }
+        Update: {
+          cost?: number
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          is_sold_out?: boolean
+          name?: string
+          stock_count?: number | null
+          tier?: Database["public"]["Enums"]["reward_tier"]
+          updated_at?: string
         }
         Relationships: []
       }
@@ -166,9 +246,13 @@ export type Database = {
           total_scans: number
         }[]
       }
+      redeem_reward: {
+        Args: { p_reward_id: string; p_user_id: string }
+        Returns: Json
+      }
     }
     Enums: {
-      [_ in never]: never
+      reward_tier: "digital" | "food" | "gift_card" | "impact"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -295,6 +379,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      reward_tier: ["digital", "food", "gift_card", "impact"],
+    },
   },
 } as const

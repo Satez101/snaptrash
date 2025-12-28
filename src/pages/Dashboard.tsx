@@ -7,7 +7,8 @@ import {
   MessageCircle, 
   Trash2,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Gift
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -100,28 +101,40 @@ const Dashboard = () => {
             delay="0.2s"
           />
 
-          {/* Rewards & Leaderboard */}
+          {/* Rewards Store */}
           <DashboardCard
-            to="/leaderboard"
-            icon={<Trophy className="w-8 h-8 text-warning" />}
+            to="/rewards"
+            icon={<Gift className="w-8 h-8 text-warning" />}
             iconBg="bg-warning/10"
-            title="Rewards & Ranks"
-            subtitle="View leaderboard & rewards"
-            badge="Top 100"
+            title="Rewards Store"
+            subtitle="Spend your SnapCreds"
+            badge="New"
             badgeColor="bg-warning/10 text-warning"
             delay="0.25s"
+          />
+
+          {/* Leaderboard */}
+          <DashboardCard
+            to="/leaderboard"
+            icon={<Trophy className="w-8 h-8 text-accent" />}
+            iconBg="bg-accent/10"
+            title="Leaderboard"
+            subtitle="Compete with eco champions"
+            badge="Top 100"
+            badgeColor="bg-accent/10 text-accent"
+            delay="0.3s"
           />
 
           {/* Disposal Machines */}
           <DashboardCard
             to="/machines"
-            icon={<MapPin className="w-8 h-8 text-accent" />}
-            iconBg="bg-accent/10"
+            icon={<MapPin className="w-8 h-8 text-[hsl(var(--eco-earth))]" />}
+            iconBg="bg-[hsl(var(--eco-earth)/0.1)]"
             title="Disposal Machines"
             subtitle="Find nearby SnapTrash machines"
             badge="Near You"
-            badgeColor="bg-accent/10 text-accent"
-            delay="0.3s"
+            badgeColor="bg-[hsl(var(--eco-earth)/0.1)] text-[hsl(var(--eco-earth))]"
+            delay="0.35s"
           />
 
           {/* Live Environment */}
