@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { 
   MessageCircle, 
   Send, 
@@ -9,7 +9,10 @@ import {
   Droplets,
   Sun,
   ArrowLeft,
-  Sparkles
+  Sparkles,
+  Mic,
+  MicOff,
+  Square
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +38,51 @@ const Chatbot = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  // Check for speech recognition support
+  useEffect(() => {
+    const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognitionAPI) {
+      setSpeechSupported(true);
+      const recognition = new SpeechRecognitionAPI();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+      recognitionRef.current = recognition;
+      recognitionRef.current.lang = "en-US";
+
+      recognitionRef.current.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join("");
+        setInput(transcript);
+      };
+
+      recognitionRef.current.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        setIsListening(false);
+        if (event.error === "not-allowed") {
+          toast.error("Microphone access denied. Please enable it in your browser settings.");
+        } else if (event.error !== "aborted") {
+          toast.error("Voice input error. Please try again.");
+        }
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -45,8 +92,28 @@ const Chatbot = () => {
     scrollToBottom();
   }, [messages]);
 
+  const toggleListening = useCallback(() => {
+    if (!recognitionRef.current) return;
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      setInput("");
+      recognitionRef.current.start();
+      setIsListening(true);
+      toast.info("Listening... Speak now");
+    }
+  }, [isListening]);
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
+
+    // Stop listening if active
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -125,7 +192,7 @@ const Chatbot = () => {
                 <span className="gradient-text">Ask me anything</span>
               </h2>
               <p className="text-muted-foreground mb-8 max-w-sm">
-                I'm specialized in environmental topics: waste disposal, recycling, sustainability, climate, and more.
+                I am specialized in environmental topics: waste disposal, recycling, sustainability, climate, and more.
               </p>
               
               {/* Suggested Questions */}
@@ -182,12 +249,24 @@ const Chatbot = () => {
 
         {/* Input */}
         <form onSubmit={handleSubmit} className="p-4 border-t border-border/50">
-          <div className="flex gap-3">
+          <div className="flex gap-2">
+            {speechSupported && (
+              <Button
+                type="button"
+                variant={isListening ? "destructive" : "outline"}
+                size="icon"
+                onClick={toggleListening}
+                disabled={isLoading}
+                className={`rounded-xl flex-shrink-0 ${isListening ? "animate-pulse" : ""}`}
+              >
+                {isListening ? <Square className="w-4 h-4" /> : <Mic className="w-5 h-5" />}
+              </Button>
+            )}
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about recycling, climate, sustainability..."
-              className="flex-1 glass-input"
+              placeholder={isListening ? "Listening..." : "Ask about recycling, climate, sustainability..."}
+              className={`flex-1 glass-input ${isListening ? "border-primary animate-pulse" : ""}`}
               disabled={isLoading}
             />
             <Button 
@@ -198,6 +277,11 @@ const Chatbot = () => {
               <Send className="w-5 h-5" />
             </Button>
           </div>
+          {isListening && (
+            <p className="text-xs text-primary text-center mt-2 animate-pulse">
+              🎤 Speak now... Tap stop when done
+            </p>
+          )}
         </form>
       </div>
     </div>
