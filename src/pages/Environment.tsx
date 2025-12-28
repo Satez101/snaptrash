@@ -132,30 +132,51 @@ const Environment = () => {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        console.log(`Location: ${latitude}, ${longitude}, Accuracy: ${accuracy}m`);
-        setCoords({ lat: latitude, lng: longitude });
-        
-        if (accuracy > 1000) {
-          toast.warning(`Location accuracy: ~${Math.round(accuracy)}m. Enable GPS for better accuracy.`);
-        }
-        
-        await fetchEnvironmentData(latitude, longitude);
-        setLoading(false);
-      },
-      (error) => {
-        let message = "Unable to get your location";
-        if (error.code === error.PERMISSION_DENIED) {
-          message = "Location permission denied. Please enable location access.";
-        }
-        setLocationError(message);
-        toast.error(message);
-        setLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
+    // First try with high accuracy (GPS), then fallback to network location
+    const getPosition = (highAccuracy: boolean): Promise<GeolocationPosition> => {
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: highAccuracy,
+          timeout: highAccuracy ? 10000 : 15000,
+          maximumAge: 0
+        });
+      });
+    };
+
+    try {
+      // Try high accuracy first
+      let position: GeolocationPosition;
+      try {
+        position = await getPosition(true);
+      } catch {
+        // Fallback to network-based location
+        console.log("GPS unavailable, using network location");
+        position = await getPosition(false);
+      }
+
+      const { latitude, longitude, accuracy } = position.coords;
+      console.log(`Location obtained: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}, Accuracy: ${accuracy}m`);
+      setCoords({ lat: latitude, lng: longitude });
+      
+      if (accuracy > 500) {
+        toast.info(`Location accuracy: ~${Math.round(accuracy)}m. Turn on GPS for precise location.`, { duration: 4000 });
+      }
+      
+      await fetchEnvironmentData(latitude, longitude);
+      setLoading(false);
+    } catch (error: any) {
+      let message = "Unable to get your location";
+      if (error.code === 1) {
+        message = "Location permission denied. Please enable location access in your browser settings.";
+      } else if (error.code === 2) {
+        message = "Location unavailable. Please check your GPS/network settings.";
+      } else if (error.code === 3) {
+        message = "Location request timed out. Please try again.";
+      }
+      setLocationError(message);
+      toast.error(message);
+      setLoading(false);
+    }
   }, []);
 
   const fetchEnvironmentData = async (lat: number, lng: number) => {
