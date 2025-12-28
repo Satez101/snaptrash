@@ -161,6 +161,7 @@ export type Database = {
           eco_creds: number
           id: string
           name: string
+          rank: number
           total_reports: number
           total_scans: number
         }[]
