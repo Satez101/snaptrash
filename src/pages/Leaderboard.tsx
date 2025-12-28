@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Trophy, Medal, Crown, TrendingUp, Leaf, Loader2, Sparkles } from "lucide-react";
+import { ArrowLeft, Trophy, Medal, Crown, TrendingUp, Leaf, Loader2, Sparkles, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,11 +13,49 @@ interface LeaderboardUser {
   rank: number;
 }
 
+// Animated counter hook for smooth number transitions
+const useAnimatedCounter = (end: number, duration: number = 1000) => {
+  const [count, setCount] = useState(end);
+  const prevEndRef = useRef(end);
+  
+  useEffect(() => {
+    if (prevEndRef.current === end) return;
+    
+    const startValue = prevEndRef.current;
+    const startTime = Date.now();
+    const difference = end - startValue;
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.round(startValue + difference * easeOut));
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    
+    requestAnimationFrame(animate);
+    prevEndRef.current = end;
+  }, [end, duration]);
+  
+  return count;
+};
+
+const motivationalQuotes = [
+  "Small actions. Real impact.",
+  "Every scan makes the planet cleaner.",
+  "Be the change you wish to see.",
+  "Together, we're building a greener future.",
+];
+
 const Leaderboard = () => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [previousCreds, setPreviousCreds] = useState<Record<string, number>>({});
+  const [hasLoaded, setHasLoaded] = useState(false);
   const { user } = useAuth();
+  const [quote] = useState(() => motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
 
   const fetchLeaderboard = useCallback(async () => {
     const { data, error } = await supabase.rpc('get_leaderboard');
@@ -25,26 +63,20 @@ const Leaderboard = () => {
     if (error) {
       console.error('Error fetching leaderboard:', error);
     } else if (data) {
-      // Track previous credits for animation
-      const prevCreds: Record<string, number> = {};
-      leaderboardData.forEach(u => {
-        prevCreds[u.id] = u.eco_creds;
-      });
-      setPreviousCreds(prevCreds);
-      
       setLeaderboardData(data.map((user: any) => ({
         ...user,
         rank: Number(user.rank)
       })));
     }
     setLoading(false);
-  }, [leaderboardData]);
+    setHasLoaded(true);
+  }, []);
 
   useEffect(() => {
     fetchLeaderboard();
-  }, []);
+  }, [fetchLeaderboard]);
 
-  // Real-time updates when profiles change
+  // Real-time updates
   useEffect(() => {
     const channel = supabase
       .channel('leaderboard-updates')
@@ -55,10 +87,7 @@ const Leaderboard = () => {
           schema: 'public',
           table: 'profiles'
         },
-        () => {
-          // Refetch leaderboard when any profile updates
-          fetchLeaderboard();
-        }
+        () => fetchLeaderboard()
       )
       .subscribe();
 
@@ -67,8 +96,15 @@ const Leaderboard = () => {
     };
   }, [fetchLeaderboard]);
 
-  const topThree = leaderboardData.slice(0, 3);
-  const rest = leaderboardData.slice(3);
+  // Reorder top 3 for podium display: [2nd, 1st, 3rd]
+  const getPodiumOrder = () => {
+    const top3 = leaderboardData.slice(0, 3);
+    if (top3.length < 3) return top3;
+    return [top3[1], top3[0], top3[2]]; // 2nd, 1st, 3rd
+  };
+
+  const podiumUsers = getPodiumOrder();
+  const restUsers = leaderboardData.slice(3);
 
   if (loading) {
     return (
@@ -94,20 +130,38 @@ const Leaderboard = () => {
         </Link>
 
         {/* Header */}
-        <div className="text-center mb-12 animate-fade-in">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-warm mb-6 animate-float">
+        <div className={cn(
+          "text-center mb-10 transition-all duration-700",
+          hasLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+        )}>
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-warm mb-6 shadow-lg shadow-warning/20">
             <Trophy className="w-10 h-10 text-warning-foreground" />
           </div>
           <h1 className="font-display text-4xl md:text-5xl font-bold mb-4">
             SnapTrash <span className="gradient-text-warm">Champions</span>
           </h1>
           <p className="text-muted-foreground">
-            The warriors leading the charge for a cleaner planet
+            The eco-warriors leading the charge for a cleaner planet
+          </p>
+        </div>
+
+        {/* Motivational Quote */}
+        <div className={cn(
+          "text-center mb-8 transition-all duration-1000 delay-300",
+          hasLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+        )}>
+          <p className="text-sm text-muted-foreground/80 italic flex items-center justify-center gap-2">
+            <Sparkles className="w-4 h-4 text-warning/60" />
+            "{quote}"
+            <Sparkles className="w-4 h-4 text-warning/60" />
           </p>
         </div>
 
         {leaderboardData.length === 0 ? (
-          <div className="glass-card p-12 text-center animate-fade-in">
+          <div className={cn(
+            "glass-card p-12 text-center transition-all duration-500",
+            hasLoaded ? "opacity-100 scale-100" : "opacity-0 scale-95"
+          )}>
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-6">
               <Leaf className="w-8 h-8 text-primary" />
             </div>
@@ -125,77 +179,45 @@ const Leaderboard = () => {
         ) : (
           <>
             {/* Podium - Top 3 */}
-            {topThree.length >= 3 && (
-              <div className="grid grid-cols-3 gap-4 mb-8 h-64 items-end animate-fade-in" style={{ animationDelay: '0.1s' }}>
-                {/* 2nd Place */}
-                <div className="flex flex-col items-center">
-                  <PodiumCard
-                    rank={2}
-                    name={topThree[1].name}
-                    ecoCredits={topThree[1].eco_creds}
-                    height="h-40"
-                    isCurrentUser={user?.id === topThree[1].id}
-                    previousCredits={previousCreds[topThree[1].id]}
-                  />
-                </div>
-
-                {/* 1st Place */}
-                <div className="flex flex-col items-center">
-                  <PodiumCard
-                    rank={1}
-                    name={topThree[0].name}
-                    ecoCredits={topThree[0].eco_creds}
-                    height="h-52"
-                    isFirst
-                    isCurrentUser={user?.id === topThree[0].id}
-                    previousCredits={previousCreds[topThree[0].id]}
-                  />
-                </div>
-
-                {/* 3rd Place */}
-                <div className="flex flex-col items-center">
-                  <PodiumCard
-                    rank={3}
-                    name={topThree[2].name}
-                    ecoCredits={topThree[2].eco_creds}
-                    height="h-32"
-                    isCurrentUser={user?.id === topThree[2].id}
-                    previousCredits={previousCreds[topThree[2].id]}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Handle less than 3 users */}
-            {topThree.length > 0 && topThree.length < 3 && (
-              <div className="flex justify-center gap-4 mb-8 animate-fade-in">
-                {topThree.map((userData, index) => (
-                  <div key={userData.id} className="flex flex-col items-center">
+            {podiumUsers.length > 0 && (
+              <div className={cn(
+                "flex justify-center items-end gap-3 md:gap-6 mb-10 px-2 transition-all duration-700 delay-200",
+                hasLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+              )}>
+                {podiumUsers.map((userData, index) => {
+                  // Map display index to actual rank: [0=2nd, 1=1st, 2=3rd]
+                  const actualRank = index === 1 ? 1 : index === 0 ? 2 : 3;
+                  const isFirst = actualRank === 1;
+                  
+                  return (
                     <PodiumCard
-                      rank={index + 1}
+                      key={userData.id}
+                      rank={actualRank}
                       name={userData.name}
                       ecoCredits={userData.eco_creds}
-                      height={index === 0 ? "h-52" : "h-40"}
-                      isFirst={index === 0}
+                      isFirst={isFirst}
                       isCurrentUser={user?.id === userData.id}
-                      previousCredits={previousCreds[userData.id]}
+                      delayIndex={index}
                     />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
             {/* Rest of Leaderboard */}
-            {rest.length > 0 && (
-              <div className="glass-card overflow-hidden animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                <div className="p-4 border-b border-border/50">
+            {restUsers.length > 0 && (
+              <div className={cn(
+                "glass-card overflow-hidden transition-all duration-700 delay-400",
+                hasLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+              )}>
+                <div className="p-4 border-b border-border/50 bg-muted/20">
                   <h3 className="font-semibold flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-primary" />
                     Rankings
                   </h3>
                 </div>
-                <div className="divide-y divide-border/30 max-h-96 overflow-y-auto">
-                  {rest.map((userData, index) => (
+                <div className="divide-y divide-border/20 max-h-[400px] overflow-y-auto scrollbar-thin">
+                  {restUsers.map((userData, index) => (
                     <LeaderboardRow
                       key={userData.id}
                       rank={index + 4}
@@ -204,7 +226,6 @@ const Leaderboard = () => {
                       scans={userData.total_scans}
                       index={index}
                       isCurrentUser={user?.id === userData.id}
-                      previousCredits={previousCreds[userData.id]}
                     />
                   ))}
                 </div>
@@ -213,8 +234,11 @@ const Leaderboard = () => {
           </>
         )}
 
-        {/* Motivational Footer */}
-        <div className="text-center mt-12 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+        {/* Footer CTA */}
+        <div className={cn(
+          "text-center mt-12 transition-all duration-700 delay-500",
+          hasLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+        )}>
           <p className="text-muted-foreground mb-4">
             Keep scanning, keep climbing, keep saving the planet!
           </p>
@@ -234,64 +258,70 @@ const PodiumCard = ({
   rank,
   name,
   ecoCredits,
-  height,
   isFirst = false,
   isCurrentUser = false,
-  previousCredits,
+  delayIndex = 0,
 }: {
   rank: number;
   name: string;
   ecoCredits: number;
-  height: string;
   isFirst?: boolean;
   isCurrentUser?: boolean;
-  previousCredits?: number;
+  delayIndex?: number;
 }) => {
-  const [animateCredits, setAnimateCredits] = useState(false);
+  const animatedCredits = useAnimatedCounter(ecoCredits, 1200);
   
-  useEffect(() => {
-    if (previousCredits !== undefined && previousCredits !== ecoCredits) {
-      setAnimateCredits(true);
-      const timer = setTimeout(() => setAnimateCredits(false), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [ecoCredits, previousCredits]);
-
-  const getRankIcon = () => {
+  const getCardHeight = () => {
     switch (rank) {
-      case 1:
-        return <Crown className="w-5 h-5" />;
-      case 2:
-      case 3:
-        return <Medal className="w-5 h-5" />;
-      default:
-        return null;
+      case 1: return "h-56 md:h-64";
+      case 2: return "h-44 md:h-52";
+      case 3: return "h-40 md:h-48";
+      default: return "h-40";
     }
   };
 
-  const getRankColor = () => {
+  const getCardWidth = () => {
     switch (rank) {
-      case 1:
-        return "bg-yellow-500 text-yellow-900";
-      case 2:
-        return "bg-gray-400 text-gray-900";
-      case 3:
-        return "bg-amber-600 text-amber-100";
-      default:
-        return "bg-muted text-muted-foreground";
+      case 1: return "w-28 md:w-36";
+      case 2: return "w-24 md:w-32";
+      case 3: return "w-24 md:w-32";
+      default: return "w-24";
     }
   };
 
-  const getGlowStyle = () => {
+  const getRingColor = () => {
     switch (rank) {
-      case 1:
-        return "shadow-[0_0_40px_hsl(45,95%,55%,0.4)] animate-pulse";
-      case 2:
-        return "shadow-[0_0_30px_hsl(0,0%,70%,0.3)]";
-      case 3:
-        return "shadow-[0_0_25px_hsl(30,80%,50%,0.3)]";
-      default:
-        return "";
+      case 1: return "ring-yellow-400/60 shadow-[0_0_40px_hsl(45,100%,50%,0.35)]";
+      case 2: return "ring-gray-300/60 shadow-[0_0_30px_hsl(0,0%,75%,0.25)]";
+      case 3: return "ring-amber-500/60 shadow-[0_0_25px_hsl(30,90%,45%,0.25)]";
+      default: return "";
+    }
+  };
+
+  const getAvatarGradient = () => {
+    switch (rank) {
+      case 1: return "bg-gradient-to-br from-yellow-300 via-yellow-400 to-yellow-600";
+      case 2: return "bg-gradient-to-br from-gray-200 via-gray-300 to-gray-500";
+      case 3: return "bg-gradient-to-br from-amber-400 via-amber-500 to-amber-700";
+      default: return "bg-gradient-primary";
+    }
+  };
+
+  const getAvatarTextColor = () => {
+    switch (rank) {
+      case 1: return "text-yellow-900";
+      case 2: return "text-gray-800";
+      case 3: return "text-amber-900";
+      default: return "text-primary-foreground";
+    }
+  };
+
+  const getBadgeStyle = () => {
+    switch (rank) {
+      case 1: return "bg-gradient-to-r from-yellow-400 to-yellow-500 text-yellow-900";
+      case 2: return "bg-gradient-to-r from-gray-300 to-gray-400 text-gray-800";
+      case 3: return "bg-gradient-to-r from-amber-500 to-amber-600 text-amber-100";
+      default: return "bg-muted text-muted-foreground";
     }
   };
 
@@ -300,55 +330,76 @@ const PodiumCard = ({
   return (
     <div
       className={cn(
-        "glass-card w-full flex flex-col items-center justify-end p-4 transition-all duration-500",
-        height,
-        isFirst && "border-yellow-500/30 animate-float",
-        getGlowStyle(),
-        isCurrentUser && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+        "relative flex flex-col items-center",
+        getCardWidth()
       )}
+      style={{ 
+        animationDelay: `${delayIndex * 150}ms`,
+        animation: "podium-enter 0.6s ease-out forwards"
+      }}
     >
+      {/* Crown for Rank 1 */}
+      {isFirst && (
+        <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-10 animate-float">
+          <Crown className="w-8 h-8 text-yellow-400 drop-shadow-[0_0_10px_hsl(45,100%,50%,0.6)]" />
+        </div>
+      )}
+
       {/* You Badge */}
       {isCurrentUser && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full flex items-center gap-1 animate-scale-in">
-          <Sparkles className="w-3 h-3" />
+        <div className="absolute -top-2 right-0 z-20 px-2 py-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center gap-1 shadow-lg">
+          <Star className="w-2.5 h-2.5" />
           You
         </div>
       )}
 
-      {/* Avatar */}
+      {/* Card */}
       <div
         className={cn(
-          "w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold mb-2 transition-transform duration-300",
-          rank === 1
-            ? "bg-gradient-to-br from-yellow-400 to-yellow-600 text-yellow-900 scale-110"
-            : rank === 2
-            ? "bg-gradient-to-br from-gray-300 to-gray-500 text-gray-900"
-            : "bg-gradient-to-br from-amber-500 to-amber-700 text-amber-100"
+          "glass-card w-full flex flex-col items-center justify-end p-4 ring-2 transition-all duration-500",
+          getCardHeight(),
+          getRingColor(),
+          isCurrentUser && "ring-primary ring-offset-2 ring-offset-background"
         )}
+        style={{
+          animation: isFirst ? "gentle-float 4s ease-in-out infinite" : "gentle-float 5s ease-in-out infinite",
+          animationDelay: `${delayIndex * 0.3}s`
+        }}
       >
-        {getAvatar()}
-      </div>
+        {/* Avatar */}
+        <div
+          className={cn(
+            "rounded-full flex items-center justify-center font-bold mb-3 ring-2 ring-white/30 shadow-lg transition-transform duration-300",
+            getAvatarGradient(),
+            getAvatarTextColor(),
+            isFirst ? "w-14 h-14 md:w-16 md:h-16 text-xl" : "w-12 h-12 md:w-14 md:h-14 text-lg"
+          )}
+        >
+          {getAvatar()}
+        </div>
 
-      {/* Name */}
-      <p className="font-medium text-sm text-center mb-1 line-clamp-1">{name}</p>
+        {/* Name */}
+        <p className="font-medium text-sm text-center mb-1 w-full truncate px-1">{name}</p>
 
-      {/* Credits */}
-      <p className={cn(
-        "text-warning font-bold text-lg transition-all duration-500",
-        animateCredits && "scale-125 text-green-400"
-      )}>
-        {ecoCredits.toLocaleString()}
-      </p>
+        {/* Credits with animation */}
+        <p className={cn(
+          "font-bold text-warning transition-all",
+          isFirst ? "text-xl" : "text-lg"
+        )}>
+          {animatedCredits.toLocaleString()}
+        </p>
+        <p className="text-[10px] text-muted-foreground">SnapCreds</p>
 
-      {/* Rank Badge */}
-      <div
-        className={cn(
-          "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold mt-2",
-          getRankColor()
-        )}
-      >
-        {getRankIcon()}
-        <span>#{rank}</span>
+        {/* Rank Badge */}
+        <div
+          className={cn(
+            "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold mt-2 shadow-md",
+            getBadgeStyle()
+          )}
+        >
+          {rank === 1 ? <Crown className="w-3.5 h-3.5" /> : <Medal className="w-3.5 h-3.5" />}
+          <span>#{rank}</span>
+        </div>
       </div>
     </div>
   );
@@ -361,7 +412,6 @@ const LeaderboardRow = ({
   scans,
   index,
   isCurrentUser = false,
-  previousCredits,
 }: {
   rank: number;
   name: string;
@@ -369,27 +419,21 @@ const LeaderboardRow = ({
   scans: number;
   index: number;
   isCurrentUser?: boolean;
-  previousCredits?: number;
 }) => {
-  const [animateCredits, setAnimateCredits] = useState(false);
-  
-  useEffect(() => {
-    if (previousCredits !== undefined && previousCredits !== ecoCredits) {
-      setAnimateCredits(true);
-      const timer = setTimeout(() => setAnimateCredits(false), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [ecoCredits, previousCredits]);
-
+  const animatedCredits = useAnimatedCounter(ecoCredits, 1000);
   const getAvatar = () => name.charAt(0).toUpperCase();
 
   return (
     <div
       className={cn(
-        "flex items-center gap-4 p-4 hover:bg-muted/30 transition-all duration-300 animate-fade-in",
-        isCurrentUser && "bg-primary/10 border-l-4 border-primary"
+        "flex items-center gap-4 p-4 transition-all duration-200 hover:bg-muted/30",
+        isCurrentUser && "bg-primary/5 border-l-4 border-primary"
       )}
-      style={{ animationDelay: `${0.3 + index * 0.05}s` }}
+      style={{ 
+        opacity: 0,
+        animation: `fade-slide-in 0.4s ease-out forwards`,
+        animationDelay: `${500 + index * 50}ms`
+      }}
     >
       {/* Rank */}
       <div className="w-8 text-center font-display font-bold text-muted-foreground">
@@ -397,7 +441,7 @@ const LeaderboardRow = ({
       </div>
 
       {/* Avatar */}
-      <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center text-sm font-bold text-primary-foreground">
+      <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center text-sm font-bold text-primary-foreground shadow-md flex-shrink-0">
         {getAvatar()}
       </div>
 
@@ -406,8 +450,8 @@ const LeaderboardRow = ({
         <div className="flex items-center gap-2">
           <p className="font-medium truncate">{name}</p>
           {isCurrentUser && (
-            <span className="px-2 py-0.5 bg-primary text-primary-foreground text-xs font-bold rounded-full flex items-center gap-1">
-              <Sparkles className="w-3 h-3" />
+            <span className="px-2 py-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center gap-1 flex-shrink-0">
+              <Star className="w-2.5 h-2.5" />
               You
             </span>
           )}
@@ -416,13 +460,8 @@ const LeaderboardRow = ({
       </div>
 
       {/* Credits */}
-      <div className="text-right">
-        <p className={cn(
-          "font-bold text-warning transition-all duration-500",
-          animateCredits && "scale-110 text-green-400"
-        )}>
-          {ecoCredits.toLocaleString()}
-        </p>
+      <div className="text-right flex-shrink-0">
+        <p className="font-bold text-warning">{animatedCredits.toLocaleString()}</p>
         <p className="text-xs text-muted-foreground">SnapCreds</p>
       </div>
     </div>
