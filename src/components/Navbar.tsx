@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Trash2, User, Trophy, Menu, X, LogOut } from "lucide-react";
+import { Trash2, User, Trophy, Menu, X, LogOut, Gift } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,7 +17,7 @@ const Navbar = () => {
   const navLinks = user ? [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/scanner", label: "Scanner" },
-    { href: "/environment", label: "Environment" },
+    { href: "/rewards", label: "Rewards" },
     { href: "/leaderboard", label: "Leaderboard" },
   ] : [
     { href: "/", label: "Home" },
