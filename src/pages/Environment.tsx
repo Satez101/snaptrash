@@ -121,8 +121,6 @@ const Environment = () => {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const watchIdRef = useRef<number | null>(null);
-  const bestFixRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
 
   const searchLocation = async (query: string) => {
     if (query.length < 2) {
@@ -181,27 +179,6 @@ const Environment = () => {
 
   const cardTitles = ["Air Quality", "Industrial Impact", "Water Bodies", "Solutions"];
 
-  const distanceKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
-    const toRad = (d: number) => (d * Math.PI) / 180;
-    const R = 6371;
-    const dLat = toRad(b.lat - a.lat);
-    const dLon = toRad(b.lng - a.lng);
-    const lat1 = toRad(a.lat);
-    const lat2 = toRad(b.lat);
-
-    const h =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    return 2 * R * Math.asin(Math.sqrt(h));
-  };
-
-  const stopWatching = () => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-  };
-
   const requestLocationPermission = useCallback(async () => {
     setLoading(true);
     setLocationError(null);
@@ -212,86 +189,35 @@ const Environment = () => {
       return;
     }
 
-    stopWatching();
-    bestFixRef.current = null;
-
-    // 1) Try a quick GPS fix
     const getPosition = (highAccuracy: boolean): Promise<GeolocationPosition> => {
       return new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: highAccuracy,
-          timeout: highAccuracy ? 10000 : 15000,
+          timeout: 15000,
           maximumAge: 0,
         });
       });
-    };
-
-    const applyFix = async (latitude: number, longitude: number, accuracy: number, source: "gps" | "network" | "watch") => {
-      const fix = { lat: latitude, lng: longitude, accuracy };
-      const prev = bestFixRef.current;
-
-      // Accept if first fix OR significantly better accuracy OR location meaningfully changed
-      const isBetterAccuracy = !prev || accuracy < prev.accuracy - 100;
-      const movedFar = prev ? distanceKm(prev, fix) > 0.25 : true;
-
-      if (!prev || isBetterAccuracy || movedFar) {
-        bestFixRef.current = fix;
-        setCoords({ lat: latitude, lng: longitude });
-
-        if (accuracy > 500) {
-          toast.info(`Low GPS accuracy (~${Math.round(accuracy)}m). Try moving outdoors or turning on GPS.`, {
-            duration: 4000,
-          });
-        }
-
-        console.log(
-          `[location:${source}] ${latitude.toFixed(6)}, ${longitude.toFixed(6)} accuracy=${Math.round(accuracy)}m`
-        );
-
-        await fetchEnvironmentData(latitude, longitude);
-      }
     };
 
     try {
       let position: GeolocationPosition;
       try {
         position = await getPosition(true);
-        await applyFix(position.coords.latitude, position.coords.longitude, position.coords.accuracy, "gps");
       } catch {
-        console.log("GPS unavailable, using network location");
+        // Simple fallback to network location
         position = await getPosition(false);
-        await applyFix(position.coords.latitude, position.coords.longitude, position.coords.accuracy, "network");
       }
 
-      // 2) If accuracy is still poor, watch for a better fix for a short window
-      const initialAccuracy = position.coords.accuracy;
-      if (initialAccuracy > 150) {
-        const startedAt = Date.now();
-        watchIdRef.current = navigator.geolocation.watchPosition(
-          async (pos) => {
-            const { latitude, longitude, accuracy } = pos.coords;
+      const { latitude, longitude, accuracy } = position.coords;
+      setCoords({ lat: latitude, lng: longitude });
 
-            // Stop early if we got a good fix or we have watched long enough
-            const goodEnough = accuracy <= 100;
-            const timedOut = Date.now() - startedAt > 20000;
-
-            await applyFix(latitude, longitude, accuracy, "watch");
-
-            if (goodEnough || timedOut) {
-              stopWatching();
-            }
-          },
-          (error) => {
-            console.log("watchPosition error:", error);
-            stopWatching();
-          },
-          { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
-        );
+      if (accuracy > 500) {
+        toast.info("GPS seems inaccurate here — use the city search for best results.", { duration: 3500 });
       }
 
+      await fetchEnvironmentData(latitude, longitude);
       setLoading(false);
     } catch (error: any) {
-      stopWatching();
       let message = "Unable to get your location";
       if (error.code === 1) {
         message = "Location permission denied. Please enable location access in your browser settings.";
@@ -359,9 +285,6 @@ const Environment = () => {
 
   useEffect(() => {
     requestLocationPermission();
-    return () => {
-      stopWatching();
-    };
   }, [requestLocationPermission]);
 
   // Keyboard navigation
