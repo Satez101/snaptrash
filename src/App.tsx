@@ -15,6 +15,7 @@ import Leaderboard from "./pages/Leaderboard";
 import Chatbot from "./pages/Chatbot";
 import Machines from "./pages/Machines";
 import Rewards from "./pages/Rewards";
+import Environment from "./pages/Environment";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/chatbot" element={<ProtectedRoute><Chatbot /></ProtectedRoute>} />
               <Route path="/machines" element={<ProtectedRoute><Machines /></ProtectedRoute>} />
               <Route path="/rewards" element={<ProtectedRoute><Rewards /></ProtectedRoute>} />
+              <Route path="/environment" element={<ProtectedRoute><Environment /></ProtectedRoute>} />
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

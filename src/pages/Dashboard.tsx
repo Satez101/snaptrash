@@ -7,7 +7,8 @@ import {
   Trash2,
   Sparkles,
   ArrowRight,
-  Gift
+  Gift,
+  Wind
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -159,6 +160,18 @@ const Dashboard = () => {
             badge="+20 SnapCreds"
             badgeColor="bg-[hsl(var(--eco-earth)/0.1)] text-[hsl(var(--eco-earth))]"
             delay="0.45s"
+          />
+
+          {/* Environment Insights */}
+          <DashboardCard
+            to="/environment"
+            icon={<Wind className="w-8 h-8 text-[hsl(var(--eco-water))]" />}
+            iconBg="bg-[hsl(var(--eco-water)/0.1)]"
+            title="Environment"
+            subtitle="Location-based environmental insights"
+            badge="New"
+            badgeColor="bg-[hsl(var(--eco-water)/0.1)] text-[hsl(var(--eco-water))]"
+            delay="0.5s"
           />
         </div>
       </div>

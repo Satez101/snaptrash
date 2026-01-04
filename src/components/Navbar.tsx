@@ -18,6 +18,7 @@ const Navbar = () => {
     { href: "/dashboard", label: "Dashboard" },
     { href: "/scanner", label: "Scanner" },
     { href: "/rewards", label: "Rewards" },
+    { href: "/environment", label: "Environment" },
     { href: "/leaderboard", label: "Leaderboard" },
   ] : [
     { href: "/", label: "Home" },
