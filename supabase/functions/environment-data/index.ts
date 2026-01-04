@@ -76,22 +76,7 @@ async function reverseGeocode(lat: number, lon: number) {
   }
 }
 
-// Generate AI-powered environmental analysis
-async function generateEnvironmentalAnalysis(
-  lat: number, 
-  lon: number, 
-  location: any, 
-  airQuality: any, 
-  weather: any
-) {
-  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-  
-  if (!LOVABLE_API_KEY) {
-    console.error('LOVABLE_API_KEY not configured');
-    return generateFallbackAnalysis(location, airQuality, weather);
-  }
-
-  const prompt = `You are an environmental data analyst. Based on the following location and environmental data, provide a detailed, accurate analysis. Be specific and factual.
+const analysisPrompt = (lat: number, lon: number, location: any, airQuality: any, weather: any) => `You are an environmental data analyst. Based on the following location and environmental data, provide a detailed, accurate analysis. Be specific and factual.
 
 Location: ${location.city}, ${location.state}, ${location.country}
 Coordinates: ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E
@@ -147,30 +132,107 @@ Provide a JSON response with this exact structure (no markdown, just JSON):
   ]
 }`;
 
-  try {
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: 'You are an environmental data analyst. Always respond with valid JSON only, no markdown formatting.' },
-          { role: 'user', content: prompt }
-        ],
+// Call AI with user's Gemini API key (direct Google API)
+async function callGeminiAPI(apiKey: string, prompt: string) {
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: prompt }]
+        }
+      ],
+      generationConfig: {
         temperature: 0.3,
-      }),
-    });
+        maxOutputTokens: 1024,
+      }
+    }),
+  });
 
-    if (!response.ok) {
-      console.error('AI API error:', response.status);
+  return response;
+}
+
+// Call Lovable AI Gateway
+async function callLovableAPI(apiKey: string, prompt: string) {
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        { role: 'system', content: 'You are an environmental data analyst. Always respond with valid JSON only, no markdown formatting.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.3,
+    }),
+  });
+
+  return response;
+}
+
+// Generate AI-powered environmental analysis
+async function generateEnvironmentalAnalysis(
+  lat: number, 
+  lon: number, 
+  location: any, 
+  airQuality: any, 
+  weather: any,
+  userGeminiApiKey?: string
+) {
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  const prompt = analysisPrompt(lat, lon, location, airQuality, weather);
+  
+  let response;
+  let useUserKey = false;
+
+  // Try Lovable AI first
+  if (LOVABLE_API_KEY) {
+    response = await callLovableAPI(LOVABLE_API_KEY, prompt);
+    
+    // If Lovable AI fails with 402 (quota) or 429 (rate limit), try user's key
+    if ((response.status === 402 || response.status === 429) && userGeminiApiKey) {
+      console.log('Lovable AI quota exceeded, falling back to user Gemini API key...');
+      useUserKey = true;
+    }
+  }
+
+  // Use user's Gemini API key as fallback
+  if (useUserKey || !LOVABLE_API_KEY) {
+    if (!userGeminiApiKey) {
+      console.log('No API key available, using fallback analysis');
       return generateFallbackAnalysis(location, airQuality, weather);
     }
+    
+    console.log('Using user Gemini API key for environment analysis...');
+    response = await callGeminiAPI(userGeminiApiKey, prompt);
+  }
 
+  if (!response || !response.ok) {
+    console.error('AI API error:', response?.status);
+    return generateFallbackAnalysis(location, airQuality, weather);
+  }
+
+  try {
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
+    
+    // Handle different response formats
+    let content;
+    if (data.choices?.[0]?.message?.content) {
+      content = data.choices[0].message.content;
+    } else if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      content = data.candidates[0].content.parts[0].text;
+    }
+    
+    if (!content) {
+      return generateFallbackAnalysis(location, airQuality, weather);
+    }
     
     // Parse JSON from response, handling potential markdown wrapping
     let jsonContent = content.trim();
@@ -258,7 +320,7 @@ serve(async (req) => {
   }
 
   try {
-    const { latitude, longitude } = await req.json();
+    const { latitude, longitude, userGeminiApiKey } = await req.json();
     
     console.log(`Fetching environment data for: ${latitude}, ${longitude}`);
 
@@ -279,7 +341,8 @@ serve(async (req) => {
       longitude, 
       location, 
       airQuality, 
-      weather
+      weather,
+      userGeminiApiKey
     );
 
     const data = {
