@@ -36,7 +36,7 @@ const suggestedQuestions = [
 ];
 
 const Chatbot = () => {
-  const { geminiApiKey } = useUserGeminiKey();
+  const { geminiApiKey, geminiModel } = useUserGeminiKey();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -131,7 +131,8 @@ const Chatbot = () => {
         body: { 
           message: text.trim(),
           history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
-          userGeminiApiKey: geminiApiKey
+          userGeminiApiKey: geminiApiKey,
+          userGeminiModel: geminiModel
         },
       });
 

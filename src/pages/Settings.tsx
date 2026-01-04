@@ -1,31 +1,33 @@
 import { useState, useEffect } from "react";
-import { Settings as SettingsIcon, Key, Eye, EyeOff, Save, ExternalLink, Loader2, Trash2 } from "lucide-react";
+import { Settings as SettingsIcon, Key, Eye, EyeOff, Save, ExternalLink, Trash2, Cpu, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useUserGeminiKey } from "@/hooks/useUserGeminiKey";
+import { useUserGeminiKey, GEMINI_MODELS, GeminiModel } from "@/hooks/useUserGeminiKey";
 
 const Settings = () => {
   const { toast } = useToast();
-  const { geminiApiKey, saveApiKey, clearApiKey } = useUserGeminiKey();
+  const { geminiApiKey, geminiModel, saveApiKey, saveModel, clearApiKey } = useUserGeminiKey();
   const [inputKey, setInputKey] = useState("");
+  const [selectedModel, setSelectedModel] = useState<GeminiModel>('gemini-2.0-flash');
   const [showApiKey, setShowApiKey] = useState(false);
 
   useEffect(() => {
-    if (geminiApiKey) {
-      setInputKey(geminiApiKey);
-    }
-  }, [geminiApiKey]);
+    if (geminiApiKey) setInputKey(geminiApiKey);
+    if (geminiModel) setSelectedModel(geminiModel);
+  }, [geminiApiKey, geminiModel]);
 
   const handleSave = () => {
     if (inputKey.trim()) {
       saveApiKey(inputKey.trim());
-      toast({
-        title: "Settings saved",
-        description: "Your API key has been saved locally.",
-      });
     }
+    saveModel(selectedModel);
+    toast({
+      title: "Settings saved",
+      description: "Your settings have been saved locally.",
+    });
   };
 
   const handleClear = () => {
@@ -50,7 +52,7 @@ const Settings = () => {
             <span className="gradient-text-eco">App Settings</span>
           </h1>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Add your Gemini API key to use AI features when default quota is exceeded.
+            Configure your Gemini API for AI features.
           </p>
         </div>
 
@@ -64,7 +66,7 @@ const Settings = () => {
             </div>
             
             <p className="text-sm text-muted-foreground">
-              Get a free API key from Google AI Studio. Your key is stored locally in your browser only.
+              Get a free API key from Google AI Studio.
             </p>
 
             <div className="space-y-2">
@@ -87,7 +89,42 @@ const Settings = () => {
                 </button>
               </div>
             </div>
+          </div>
 
+          {/* Model Selection */}
+          <div className="space-y-4 pt-4 border-t border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <Cpu className="w-5 h-5 text-primary" />
+              <h2 className="font-display font-semibold text-lg">Model Selection</h2>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Gemini Model</Label>
+              <Select value={selectedModel} onValueChange={(v) => setSelectedModel(v as GeminiModel)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GEMINI_MODELS.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{model.name}</span>
+                        <span className="text-xs text-muted-foreground">({model.description})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Usage Link */}
+          <div className="space-y-4 pt-4 border-t border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <BarChart3 className="w-5 h-5 text-primary" />
+              <h2 className="font-display font-semibold text-lg">Usage & Quota</h2>
+            </div>
+            
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <ExternalLink className="w-4 h-4" />
               <a 
@@ -96,7 +133,18 @@ const Settings = () => {
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                Get your free API key from Google AI Studio
+                Get your free API key
+              </a>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <ExternalLink className="w-4 h-4" />
+              <a 
+                href="https://aistudio.google.com/app/plan_information" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                Check your usage & tokens remaining
               </a>
             </div>
           </div>
@@ -109,9 +157,9 @@ const Settings = () => {
                 Remove
               </Button>
             )}
-            <Button onClick={handleSave} disabled={!inputKey.trim()} className="flex-1 gap-2">
+            <Button onClick={handleSave} className="flex-1 gap-2">
               <Save className="w-4 h-4" />
-              Save Key
+              Save Settings
             </Button>
           </div>
         </div>
@@ -119,7 +167,7 @@ const Settings = () => {
         {/* Info Card */}
         <div className="glass-card p-4 mt-6 opacity-0 animate-slide-up" style={{ animationDelay: '0.2s' }}>
           <p className="text-sm text-muted-foreground text-center">
-            Your API key is stored only in your browser's local storage - never sent to our servers.
+            Your settings are stored only in your browser - never sent to our servers.
           </p>
         </div>
       </div>

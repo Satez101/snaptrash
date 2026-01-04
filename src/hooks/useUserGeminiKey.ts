@@ -1,15 +1,26 @@
 import { useState, useEffect } from 'react';
 
 const STORAGE_KEY = 'user_gemini_api_key';
+const MODEL_KEY = 'user_gemini_model';
+
+export const GEMINI_MODELS = [
+  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Fast & free' },
+  { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite', description: 'Fastest, basic tasks' },
+  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', description: 'Most capable' },
+] as const;
+
+export type GeminiModel = typeof GEMINI_MODELS[number]['id'];
 
 export function useUserGeminiKey() {
   const [geminiApiKey, setGeminiApiKey] = useState<string | null>(null);
+  const [geminiModel, setGeminiModel] = useState<GeminiModel>('gemini-2.0-flash');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Load from localStorage
-    const stored = localStorage.getItem(STORAGE_KEY);
-    setGeminiApiKey(stored);
+    const storedKey = localStorage.getItem(STORAGE_KEY);
+    const storedModel = localStorage.getItem(MODEL_KEY) as GeminiModel | null;
+    setGeminiApiKey(storedKey);
+    if (storedModel) setGeminiModel(storedModel);
     setIsLoading(false);
   }, []);
 
@@ -18,10 +29,15 @@ export function useUserGeminiKey() {
     setGeminiApiKey(key);
   };
 
+  const saveModel = (model: GeminiModel) => {
+    localStorage.setItem(MODEL_KEY, model);
+    setGeminiModel(model);
+  };
+
   const clearApiKey = () => {
     localStorage.removeItem(STORAGE_KEY);
     setGeminiApiKey(null);
   };
 
-  return { geminiApiKey, isLoading, saveApiKey, clearApiKey };
+  return { geminiApiKey, geminiModel, isLoading, saveApiKey, saveModel, clearApiKey };
 }
