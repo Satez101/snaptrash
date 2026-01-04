@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   Sparkles,
   Mic,
+  MicOff,
   Square
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,8 +19,6 @@ import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useUserGeminiKey } from "@/hooks/useUserGeminiKey";
-import { ApiKeyPrompt } from "@/components/ApiKeyPrompt";
 
 interface Message {
   id: string;
@@ -36,14 +35,11 @@ const suggestedQuestions = [
 ];
 
 const Chatbot = () => {
-  const { geminiApiKey, geminiModel } = useUserGeminiKey();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
-  const [showApiKeyPrompt, setShowApiKeyPrompt] = useState(false);
-  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -57,19 +53,22 @@ const Chatbot = () => {
       recognition.interimResults = true;
       recognition.lang = "en-US";
       recognitionRef.current = recognition;
+      recognitionRef.current.lang = "en-US";
 
-      recognitionRef.current.onresult = (event: any) => {
+      recognitionRef.current.onresult = (event) => {
         const transcript = Array.from(event.results)
-          .map((result: any) => result[0].transcript)
+          .map(result => result[0].transcript)
           .join("");
         setInput(transcript);
       };
 
-      recognitionRef.current.onerror = (event: any) => {
+      recognitionRef.current.onerror = (event) => {
         console.error("Speech recognition error:", event.error);
         setIsListening(false);
         if (event.error === "not-allowed") {
-          toast.error("Microphone access denied.");
+          toast.error("Microphone access denied. Please enable it in your browser settings.");
+        } else if (event.error !== "aborted") {
+          toast.error("Voice input error. Please try again.");
         }
       };
 
@@ -110,6 +109,7 @@ const Chatbot = () => {
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
 
+    // Stop listening if active
     if (isListening && recognitionRef.current) {
       recognitionRef.current.stop();
       setIsListening(false);
@@ -130,32 +130,11 @@ const Chatbot = () => {
       const { data, error } = await supabase.functions.invoke("snaptrash-chat", {
         body: { 
           message: text.trim(),
-          history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
-          userGeminiApiKey: geminiApiKey,
-          userGeminiModel: geminiModel
+          history: messages.slice(-10).map(m => ({ role: m.role, content: m.content }))
         },
       });
 
       if (error) throw error;
-
-      if (data.needsApiKey) {
-        setPendingMessage(text.trim());
-        setShowApiKeyPrompt(true);
-        setIsLoading(false);
-        return;
-      }
-
-      if (data.rateLimited) {
-        toast.error("Rate limited. Please wait a moment.");
-        setIsLoading(false);
-        return;
-      }
-
-      if (data.error) {
-        toast.error(data.error);
-        setIsLoading(false);
-        return;
-      }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -173,18 +152,6 @@ const Chatbot = () => {
     }
   };
 
-  const handleApiKeySaved = () => {
-    setShowApiKeyPrompt(false);
-    toast.success("API key saved!");
-    // Retry the pending message
-    if (pendingMessage) {
-      setTimeout(() => {
-        sendMessage(pendingMessage);
-        setPendingMessage(null);
-      }, 500);
-    }
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     sendMessage(input);
@@ -192,13 +159,6 @@ const Chatbot = () => {
 
   return (
     <div className="min-h-screen pt-20 pb-4 px-4 flex flex-col">
-      {showApiKeyPrompt && (
-        <ApiKeyPrompt 
-          onClose={() => setShowApiKeyPrompt(false)} 
-          onSaved={handleApiKeySaved} 
-        />
-      )}
-
       {/* Header */}
       <div className="max-w-3xl mx-auto w-full mb-4">
         <div className="flex items-center gap-4 mb-4">
@@ -235,6 +195,7 @@ const Chatbot = () => {
                 I am specialized in environmental topics: waste disposal, recycling, sustainability, climate, and more.
               </p>
               
+              {/* Suggested Questions */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
                 {suggestedQuestions.map((q, i) => (
                   <button

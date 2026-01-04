@@ -27,14 +27,12 @@ import {
   Factory,
   ThermometerSun,
   Droplets,
-  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useUserGeminiKey } from "@/hooks/useUserGeminiKey";
 
 interface ScanResult {
   category: string;
@@ -85,7 +83,6 @@ const getAqiInfo = (aqi: number) => {
 
 const Scanner = () => {
   const { profile, refreshProfile } = useAuth();
-  const { geminiApiKey } = useUserGeminiKey();
   const [locationGranted, setLocationGranted] = useState(false);
   const [locationError, setLocationError] = useState(false);
   const [coords, setCoords] = useState<LocationCoords | null>(null);
@@ -139,7 +136,7 @@ const Scanner = () => {
     setLoadingEnv(true);
     try {
       const { data, error } = await supabase.functions.invoke("environment-data", {
-        body: { latitude: lat, longitude: lng, userGeminiApiKey: geminiApiKey },
+        body: { latitude: lat, longitude: lng },
       });
       if (!error && data) {
         // Normalize location to a string
@@ -189,23 +186,12 @@ const Scanner = () => {
       
       try {
         const { data, error } = await supabase.functions.invoke('analyze-trash', {
-          body: { imageBase64, userGeminiApiKey: geminiApiKey }
+          body: { imageBase64 }
         });
 
         if (error) {
           console.error('Error analyzing image:', error);
           toast.error('Failed to analyze image. Please try again.');
-          setIsScanning(false);
-          return;
-        }
-
-        if (data.needsApiKey) {
-          toast.error(
-            <div className="flex flex-col gap-2">
-              <span>{data.error}</span>
-              <Link to="/settings" className="text-primary underline text-sm">Add API Key in Settings</Link>
-            </div>
-          );
           setIsScanning(false);
           return;
         }

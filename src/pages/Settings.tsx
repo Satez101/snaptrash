@@ -1,42 +1,87 @@
 import { useState, useEffect } from "react";
-import { Settings as SettingsIcon, Key, Eye, EyeOff, Save, ExternalLink, Trash2, Cpu, BarChart3 } from "lucide-react";
+import { Settings as SettingsIcon, Key, Eye, EyeOff, Save, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useUserGeminiKey, GEMINI_MODELS, GeminiModel } from "@/hooks/useUserGeminiKey";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const Settings = () => {
+  const { user } = useAuth();
   const { toast } = useToast();
-  const { geminiApiKey, geminiModel, saveApiKey, saveModel, clearApiKey } = useUserGeminiKey();
-  const [inputKey, setInputKey] = useState("");
-  const [selectedModel, setSelectedModel] = useState<GeminiModel>('gemini-2.0-flash');
+  const [geminiApiKey, setGeminiApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (geminiApiKey) setInputKey(geminiApiKey);
-    if (geminiModel) setSelectedModel(geminiModel);
-  }, [geminiApiKey, geminiModel]);
-
-  const handleSave = async () => {
-    if (inputKey.trim()) {
-      await saveApiKey(inputKey.trim());
+    if (user) {
+      loadSettings();
     }
-    saveModel(selectedModel);
-    toast({
-      title: "Settings saved",
-      description: "Your settings have been saved.",
-    });
+  }, [user]);
+
+  const loadSettings = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('user_settings')
+        .select('gemini_api_key')
+        .eq('user_id', user?.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      
+      if (data?.gemini_api_key) {
+        setGeminiApiKey(data.gemini_api_key);
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleClear = async () => {
-    await clearApiKey();
-    setInputKey("");
-    toast({
-      title: "API key removed",
-      description: "Your API key has been cleared.",
-    });
+  const saveSettings = async () => {
+    if (!user) return;
+
+    setIsSaving(true);
+    try {
+      const { data: existing } = await supabase
+        .from('user_settings')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from('user_settings')
+          .update({ gemini_api_key: geminiApiKey || null })
+          .eq('user_id', user.id);
+        
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('user_settings')
+          .insert({ user_id: user.id, gemini_api_key: geminiApiKey || null });
+        
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Settings saved",
+        description: "Your API key has been saved successfully.",
+      });
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save settings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -52,7 +97,7 @@ const Settings = () => {
             <span className="gradient-text-eco">App Settings</span>
           </h1>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Configure your Gemini API for AI features.
+            Configure your AI settings and API keys for enhanced features.
           </p>
         </div>
 
@@ -66,7 +111,8 @@ const Settings = () => {
             </div>
             
             <p className="text-sm text-muted-foreground">
-              Get a free API key from Google AI Studio.
+              Add your own Gemini API key from Google AI Studio to use AI features. 
+              This is optional - the app uses default AI when no key is provided.
             </p>
 
             <div className="space-y-2">
@@ -76,9 +122,10 @@ const Settings = () => {
                   id="gemini-key"
                   type={showApiKey ? "text" : "password"}
                   placeholder="Enter your Gemini API key..."
-                  value={inputKey}
-                  onChange={(e) => setInputKey(e.target.value)}
+                  value={geminiApiKey}
+                  onChange={(e) => setGeminiApiKey(e.target.value)}
                   className="pr-10"
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
@@ -89,42 +136,7 @@ const Settings = () => {
                 </button>
               </div>
             </div>
-          </div>
 
-          {/* Model Selection */}
-          <div className="space-y-4 pt-4 border-t border-border">
-            <div className="flex items-center gap-2 mb-2">
-              <Cpu className="w-5 h-5 text-primary" />
-              <h2 className="font-display font-semibold text-lg">Model Selection</h2>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Gemini Model</Label>
-              <Select value={selectedModel} onValueChange={(v) => setSelectedModel(v as GeminiModel)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {GEMINI_MODELS.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{model.name}</span>
-                        <span className="text-xs text-muted-foreground">({model.description})</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Usage Link */}
-          <div className="space-y-4 pt-4 border-t border-border">
-            <div className="flex items-center gap-2 mb-2">
-              <BarChart3 className="w-5 h-5 text-primary" />
-              <h2 className="font-display font-semibold text-lg">Usage & Quota</h2>
-            </div>
-            
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <ExternalLink className="w-4 h-4" />
               <a 
@@ -133,33 +145,29 @@ const Settings = () => {
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                Get your free API key
-              </a>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <ExternalLink className="w-4 h-4" />
-              <a 
-                href="https://aistudio.google.com/app/plan_information" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                Check your usage & tokens remaining
+                Get your API key from Google AI Studio
               </a>
             </div>
           </div>
 
-          {/* Buttons */}
-          <div className="flex gap-3 pt-4 border-t border-border">
-            {geminiApiKey && (
-              <Button variant="outline" onClick={handleClear} className="gap-2">
-                <Trash2 className="w-4 h-4" />
-                Remove
-              </Button>
-            )}
-            <Button onClick={handleSave} className="flex-1 gap-2">
-              <Save className="w-4 h-4" />
-              Save Settings
+          {/* Save Button */}
+          <div className="pt-4 border-t border-border">
+            <Button
+              onClick={saveSettings}
+              disabled={isSaving || isLoading}
+              className="w-full"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Settings
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -167,7 +175,7 @@ const Settings = () => {
         {/* Info Card */}
         <div className="glass-card p-4 mt-6 opacity-0 animate-slide-up" style={{ animationDelay: '0.2s' }}>
           <p className="text-sm text-muted-foreground text-center">
-            Your API key is stored securely in your account.
+            Your API key is stored securely and only used for AI features in this app.
           </p>
         </div>
       </div>
