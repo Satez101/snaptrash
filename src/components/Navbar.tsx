@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Trash2, User, Trophy, Menu, X, LogOut, Gift } from "lucide-react";
+import { Trash2, User, Trophy, Menu, X, LogOut, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ const Navbar = () => {
     { href: "/scanner", label: "Scanner" },
     { href: "/rewards", label: "Rewards" },
     { href: "/leaderboard", label: "Leaderboard" },
+    { href: "/settings", label: "Settings" },
   ] : [
     { href: "/", label: "Home" },
     { href: "/leaderboard", label: "Leaderboard" },
