@@ -12,5 +12,5 @@ verify_jwt = false
 [functions.disposal-machines]
 verify_jwt = false
 
-[functions.environment-insights]
+[functions.environment-intel]
 verify_jwt = false
