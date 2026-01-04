@@ -12,13 +12,15 @@ import {
   Sparkles,
   Mic,
   MicOff,
-  Square
+  Square,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useUserGeminiKey } from "@/hooks/useUserGeminiKey";
 
 interface Message {
   id: string;
@@ -35,6 +37,7 @@ const suggestedQuestions = [
 ];
 
 const Chatbot = () => {
+  const { geminiApiKey } = useUserGeminiKey();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -130,11 +133,24 @@ const Chatbot = () => {
       const { data, error } = await supabase.functions.invoke("snaptrash-chat", {
         body: { 
           message: text.trim(),
-          history: messages.slice(-10).map(m => ({ role: m.role, content: m.content }))
+          history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
+          userGeminiApiKey: geminiApiKey
         },
       });
 
       if (error) throw error;
+
+      if (data.needsApiKey) {
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "⚠️ AI quota exceeded. Please add your Gemini API key in Settings to continue chatting.",
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        setIsLoading(false);
+        return;
+      }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),

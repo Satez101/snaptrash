@@ -13,7 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  MapPinned
+  MapPinned,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ import IndustryStoryCard from "@/components/environment/IndustryStoryCard";
 import WaterBodyStoryCard from "@/components/environment/WaterBodyStoryCard";
 import SolutionsStoryCard from "@/components/environment/SolutionsStoryCard";
 import LocationLoader from "@/components/environment/LocationLoader";
+import { useUserGeminiKey } from "@/hooks/useUserGeminiKey";
 
 interface SearchResult {
   name: string;
@@ -112,6 +114,7 @@ const getHealthAdvice = (aqi: number) => {
 };
 
 const Environment = () => {
+  const { geminiApiKey } = useUserGeminiKey();
   const [loading, setLoading] = useState(true);
   const [locationStatus, setLocationStatus] = useState<"requesting" | "detecting" | "refining">("requesting");
   const [currentAccuracy, setCurrentAccuracy] = useState<number | undefined>(undefined);
@@ -309,7 +312,7 @@ const Environment = () => {
   const fetchEnvironmentData = async (lat: number, lng: number) => {
     try {
       const { data: envData, error } = await supabase.functions.invoke("environment-data", {
-        body: { latitude: lat, longitude: lng },
+        body: { latitude: lat, longitude: lng, userGeminiApiKey: geminiApiKey },
       });
 
       if (error) throw error;

@@ -69,13 +69,83 @@ EXAMPLES OF WHAT TO ALWAYS IDENTIFY (never refuse):
 
 Your goal is to HELP USERS ACT, not to reject their input. Always provide actionable disposal guidance.`;
 
+// Call AI with user's Gemini API key (direct Google API)
+async function callGeminiAPI(apiKey: string, imageBase64: string) {
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: systemPrompt },
+            { text: 'Analyze this image and identify the waste item. Provide detailed classification and responsible disposal instructions. Remember: ALWAYS attempt identification unless the image is completely empty.' },
+            {
+              inline_data: {
+                mime_type: imageBase64.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
+                data: imageBase64.replace(/^data:image\/\w+;base64,/, '')
+              }
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.4,
+        maxOutputTokens: 1024,
+      }
+    }),
+  });
+
+  return response;
+}
+
+// Call Lovable AI Gateway
+async function callLovableAPI(apiKey: string, imageBase64: string) {
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Analyze this image and identify the waste item. Provide detailed classification and responsible disposal instructions. Remember: ALWAYS attempt identification unless the image is completely empty.'
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: imageBase64
+              }
+            }
+          ]
+        }
+      ],
+    }),
+  });
+
+  return response;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { imageBase64 } = await req.json();
+    const { imageBase64, userGeminiApiKey } = await req.json();
     
     if (!imageBase64) {
       return new Response(
@@ -85,62 +155,52 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY is not configured');
-      return new Response(
-        JSON.stringify({ error: 'AI service not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    let response;
+    let useUserKey = false;
+
+    // Try Lovable AI first
+    if (LOVABLE_API_KEY) {
+      console.log('SnapTrash Vision AI: Analyzing image with Lovable AI...');
+      response = await callLovableAPI(LOVABLE_API_KEY, imageBase64);
+      
+      // If Lovable AI fails with 402 (quota) or 429 (rate limit), try user's key
+      if ((response.status === 402 || response.status === 429) && userGeminiApiKey) {
+        console.log('Lovable AI quota exceeded, falling back to user Gemini API key...');
+        useUserKey = true;
+      }
     }
 
-    console.log('SnapTrash Vision AI: Analyzing image...');
-
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Analyze this image and identify the waste item. Provide detailed classification and responsible disposal instructions. Remember: ALWAYS attempt identification unless the image is completely empty.'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: imageBase64
-                }
-              }
-            ]
-          }
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI Gateway error:', response.status, errorText);
+    // Use user's Gemini API key as fallback
+    if (useUserKey || !LOVABLE_API_KEY) {
+      if (!userGeminiApiKey) {
+        const errorMsg = !LOVABLE_API_KEY 
+          ? 'AI service not configured. Please add your Gemini API key in Settings.'
+          : 'AI quota exceeded. Please add your Gemini API key in Settings to continue.';
+        return new Response(
+          JSON.stringify({ error: errorMsg, needsApiKey: true }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       
-      if (response.status === 429) {
+      console.log('SnapTrash Vision AI: Analyzing image with user Gemini API key...');
+      response = await callGeminiAPI(userGeminiApiKey, imageBase64);
+    }
+
+    if (!response || !response.ok) {
+      const errorText = response ? await response.text() : 'No response';
+      console.error('AI error:', response?.status, errorText);
+      
+      if (response?.status === 400 && errorText.includes('API_KEY_INVALID')) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid Gemini API key. Please check your API key in Settings.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      if (response?.status === 429) {
         return new Response(
           JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'AI service quota exceeded.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
@@ -151,7 +211,16 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+    
+    // Handle different response formats (Lovable AI vs Google Gemini API)
+    let content;
+    if (data.choices?.[0]?.message?.content) {
+      // Lovable AI format
+      content = data.choices[0].message.content;
+    } else if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      // Google Gemini API format
+      content = data.candidates[0].content.parts[0].text;
+    }
     
     if (!content) {
       console.error('No content in AI response:', data);
@@ -161,7 +230,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('SnapTrash Vision AI response:', content);
+    console.log('SnapTrash Vision AI response received');
 
     // Parse the JSON from the AI response
     let result;
