@@ -46,8 +46,8 @@ async function callGeminiAPI(apiKey: string, message: string, history: any[]) {
     parts: [{ text: message }]
   });
 
-  // Use gemini-1.5-flash which has better quota limits
-  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey, {
+  // Use gemini-2.0-flash which is free via Google AI Studio
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
