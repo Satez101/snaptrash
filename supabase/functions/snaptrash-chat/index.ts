@@ -29,7 +29,7 @@ RULES:
 • For disposal questions, mention SnapTrash machines in the app`;
 
 // Call AI with user's Gemini API key (direct Google API)
-async function callGeminiAPI(apiKey: string, message: string, history: any[]) {
+async function callGeminiAPI(apiKey: string, message: string, history: any[], model: string = 'gemini-2.0-flash') {
   const contents = [];
   
   // Add history
@@ -46,8 +46,7 @@ async function callGeminiAPI(apiKey: string, message: string, history: any[]) {
     parts: [{ text: message }]
   });
 
-  // Use gemini-2.0-flash which is free via Google AI Studio
-  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -94,7 +93,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, history, userGeminiApiKey } = await req.json();
+    const { message, history, userGeminiApiKey, userGeminiModel } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     let response;
@@ -120,8 +119,8 @@ serve(async (req) => {
         );
       }
       
-      console.log('Using user Gemini API key for chat...');
-      response = await callGeminiAPI(userGeminiApiKey, message, history);
+      console.log('Using user Gemini API key with model:', userGeminiModel || 'gemini-2.0-flash');
+      response = await callGeminiAPI(userGeminiApiKey, message, history, userGeminiModel || 'gemini-2.0-flash');
     }
 
     if (!response || !response.ok) {
