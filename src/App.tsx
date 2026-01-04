@@ -16,6 +16,7 @@ import Chatbot from "./pages/Chatbot";
 import Environment from "./pages/Environment";
 import Machines from "./pages/Machines";
 import Rewards from "./pages/Rewards";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/environment" element={<ProtectedRoute><Environment /></ProtectedRoute>} />
               <Route path="/machines" element={<ProtectedRoute><Machines /></ProtectedRoute>} />
               <Route path="/rewards" element={<ProtectedRoute><Rewards /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
