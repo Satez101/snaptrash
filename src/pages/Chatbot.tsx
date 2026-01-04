@@ -11,9 +11,7 @@ import {
   ArrowLeft,
   Sparkles,
   Mic,
-  MicOff,
-  Square,
-  Settings
+  Square
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +19,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useUserGeminiKey } from "@/hooks/useUserGeminiKey";
+import { ApiKeyPrompt } from "@/components/ApiKeyPrompt";
 
 interface Message {
   id: string;
@@ -43,6 +42,8 @@ const Chatbot = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [showApiKeyPrompt, setShowApiKeyPrompt] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -56,22 +57,19 @@ const Chatbot = () => {
       recognition.interimResults = true;
       recognition.lang = "en-US";
       recognitionRef.current = recognition;
-      recognitionRef.current.lang = "en-US";
 
-      recognitionRef.current.onresult = (event) => {
+      recognitionRef.current.onresult = (event: any) => {
         const transcript = Array.from(event.results)
-          .map(result => result[0].transcript)
+          .map((result: any) => result[0].transcript)
           .join("");
         setInput(transcript);
       };
 
-      recognitionRef.current.onerror = (event) => {
+      recognitionRef.current.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
         setIsListening(false);
         if (event.error === "not-allowed") {
-          toast.error("Microphone access denied. Please enable it in your browser settings.");
-        } else if (event.error !== "aborted") {
-          toast.error("Voice input error. Please try again.");
+          toast.error("Microphone access denied.");
         }
       };
 
@@ -112,7 +110,6 @@ const Chatbot = () => {
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
 
-    // Stop listening if active
     if (isListening && recognitionRef.current) {
       recognitionRef.current.stop();
       setIsListening(false);
@@ -141,13 +138,20 @@ const Chatbot = () => {
       if (error) throw error;
 
       if (data.needsApiKey) {
-        const errorMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: "⚠️ AI quota exceeded. Please add your Gemini API key in Settings to continue chatting.",
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, errorMessage]);
+        setPendingMessage(text.trim());
+        setShowApiKeyPrompt(true);
+        setIsLoading(false);
+        return;
+      }
+
+      if (data.rateLimited) {
+        toast.error("Rate limited. Please wait a moment.");
+        setIsLoading(false);
+        return;
+      }
+
+      if (data.error) {
+        toast.error(data.error);
         setIsLoading(false);
         return;
       }
@@ -168,6 +172,18 @@ const Chatbot = () => {
     }
   };
 
+  const handleApiKeySaved = () => {
+    setShowApiKeyPrompt(false);
+    toast.success("API key saved!");
+    // Retry the pending message
+    if (pendingMessage) {
+      setTimeout(() => {
+        sendMessage(pendingMessage);
+        setPendingMessage(null);
+      }, 500);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     sendMessage(input);
@@ -175,6 +191,13 @@ const Chatbot = () => {
 
   return (
     <div className="min-h-screen pt-20 pb-4 px-4 flex flex-col">
+      {showApiKeyPrompt && (
+        <ApiKeyPrompt 
+          onClose={() => setShowApiKeyPrompt(false)} 
+          onSaved={handleApiKeySaved} 
+        />
+      )}
+
       {/* Header */}
       <div className="max-w-3xl mx-auto w-full mb-4">
         <div className="flex items-center gap-4 mb-4">
@@ -211,7 +234,6 @@ const Chatbot = () => {
                 I am specialized in environmental topics: waste disposal, recycling, sustainability, climate, and more.
               </p>
               
-              {/* Suggested Questions */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
                 {suggestedQuestions.map((q, i) => (
                   <button
