@@ -20,13 +20,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   HelpCircle,
-  ChevronDown,
-  ChevronUp,
-  Wind,
-  Sun,
-  Factory,
-  ThermometerSun,
-  Droplets,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -49,16 +42,6 @@ interface LocationCoords {
   longitude: number;
 }
 
-interface EnvironmentData {
-  aqi: number;
-  aqiLevel: string;
-  temperature: number;
-  humidity: number;
-  solarPotential: number;
-  solarRating: string;
-  location: string;
-}
-
 interface NearbyMachine {
   id: string;
   name: string;
@@ -74,13 +57,6 @@ const getConfidenceInfo = (confidence: number) => {
   return { label: "Low", class: "confidence-low", icon: HelpCircle };
 };
 
-const getAqiInfo = (aqi: number) => {
-  if (aqi <= 50) return { label: "Good", class: "text-[hsl(var(--aqi-good))]" };
-  if (aqi <= 100) return { label: "Moderate", class: "text-[hsl(var(--aqi-moderate))]" };
-  if (aqi <= 150) return { label: "Unhealthy for Sensitive", class: "text-[hsl(var(--aqi-unhealthy-sensitive))]" };
-  return { label: "Unhealthy", class: "text-[hsl(var(--aqi-unhealthy))]" };
-};
-
 const Scanner = () => {
   const { profile, refreshProfile } = useAuth();
   const [locationGranted, setLocationGranted] = useState(false);
@@ -90,10 +66,7 @@ const Scanner = () => {
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [feedbackGiven, setFeedbackGiven] = useState(false);
-  const [envExpanded, setEnvExpanded] = useState(false);
-  const [envData, setEnvData] = useState<EnvironmentData | null>(null);
   const [nearbyMachines, setNearbyMachines] = useState<NearbyMachine[]>([]);
-  const [loadingEnv, setLoadingEnv] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const points = profile?.eco_creds || 0;
@@ -119,47 +92,13 @@ const Scanner = () => {
           };
           setCoords(newCoords);
           
-          // Fetch environmental data and nearby machines
-          await Promise.all([
-            fetchEnvironmentData(newCoords.latitude, newCoords.longitude),
-            fetchNearbyMachines(newCoords.latitude, newCoords.longitude)
-          ]);
+          // Fetch nearby disposal machines
+          await fetchNearbyMachines(newCoords.latitude, newCoords.longitude);
         },
         () => {
           setLocationError(true);
         }
       );
-    }
-  };
-
-  const fetchEnvironmentData = async (lat: number, lng: number) => {
-    setLoadingEnv(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("environment-data", {
-        body: { latitude: lat, longitude: lng },
-      });
-      if (!error && data) {
-        // Normalize location to a string
-        let loc: string = '';
-        if (typeof data.location === 'object' && data.location) {
-          loc = data.location.city || data.location.displayName || '';
-        } else if (typeof data.location === 'string') {
-          loc = data.location;
-        }
-        setEnvData({
-          aqi: data.airQuality?.aqi ?? 0,
-          aqiLevel: data.airQuality?.level ?? '',
-          temperature: data.weather?.temperature ?? 0,
-          humidity: data.weather?.humidity ?? 0,
-          solarPotential: data.weather?.uvIndex ? Math.min(data.weather.uvIndex * 10, 100) : 0,
-          solarRating: data.weather?.uvIndex >= 6 ? 'High' : data.weather?.uvIndex >= 3 ? 'Moderate' : 'Low',
-          location: loc,
-        });
-      }
-    } catch (err) {
-      console.error("Error fetching environment data:", err);
-    } finally {
-      setLoadingEnv(false);
     }
   };
 
@@ -379,64 +318,6 @@ const Scanner = () => {
             </p>
           )}
         </div>
-
-        {/* Environmental Data Panel - Expandable */}
-        {locationGranted && envData && (
-          <div className="glass-card mb-6 overflow-hidden animate-fade-in" style={{ animationDelay: '0.15s' }}>
-            <button
-              onClick={() => setEnvExpanded(!envExpanded)}
-              className="w-full p-4 flex items-center justify-between hover:bg-muted/30 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center">
-                  <Wind className="w-5 h-5 text-secondary" />
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-medium text-foreground">Live Environment Data</p>
-                  <p className="text-xs text-muted-foreground">{envData.location}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <p className={cn("text-lg font-bold", getAqiInfo(envData.aqi).class)}>
-                    AQI {envData.aqi}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{getAqiInfo(envData.aqi).label}</p>
-                </div>
-                {envExpanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-              </div>
-            </button>
-            
-            {envExpanded && (
-              <div className="px-4 pb-4 pt-2 border-t border-border/50 animate-fade-in">
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  <div className="text-center p-3 rounded-xl bg-muted/30">
-                    <ThermometerSun className="w-5 h-5 text-warning mx-auto mb-1" />
-                    <p className="font-bold text-foreground">{envData.temperature}°C</p>
-                    <p className="text-xs text-muted-foreground">Temp</p>
-                  </div>
-                  <div className="text-center p-3 rounded-xl bg-muted/30">
-                    <Droplets className="w-5 h-5 text-[hsl(var(--eco-water))] mx-auto mb-1" />
-                    <p className="font-bold text-foreground">{envData.humidity}%</p>
-                    <p className="text-xs text-muted-foreground">Humidity</p>
-                  </div>
-                  <div className="text-center p-3 rounded-xl bg-muted/30">
-                    <Sun className="w-5 h-5 text-[hsl(var(--eco-solar))] mx-auto mb-1" />
-                    <p className="font-bold text-foreground">{envData.solarPotential}%</p>
-                    <p className="text-xs text-muted-foreground">Solar</p>
-                  </div>
-                </div>
-                <Link to="/environment">
-                  <Button variant="outline" size="sm" className="w-full gap-2">
-                    <Factory className="w-4 h-4" />
-                    View Full Environmental Report
-                    <ExternalLink className="w-3 h-3" />
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-4 mb-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
