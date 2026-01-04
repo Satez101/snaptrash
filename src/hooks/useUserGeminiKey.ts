@@ -1,38 +1,27 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+
+const STORAGE_KEY = 'user_gemini_api_key';
 
 export function useUserGeminiKey() {
-  const { user } = useAuth();
   const [geminiApiKey, setGeminiApiKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      fetchApiKey();
-    } else {
-      setGeminiApiKey(null);
-      setIsLoading(false);
-    }
-  }, [user]);
+    // Load from localStorage
+    const stored = localStorage.getItem(STORAGE_KEY);
+    setGeminiApiKey(stored);
+    setIsLoading(false);
+  }, []);
 
-  const fetchApiKey = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('user_settings')
-        .select('gemini_api_key')
-        .eq('user_id', user?.id)
-        .maybeSingle();
-
-      if (error) throw error;
-      setGeminiApiKey(data?.gemini_api_key || null);
-    } catch (error) {
-      console.error('Error fetching API key:', error);
-      setGeminiApiKey(null);
-    } finally {
-      setIsLoading(false);
-    }
+  const saveApiKey = (key: string) => {
+    localStorage.setItem(STORAGE_KEY, key);
+    setGeminiApiKey(key);
   };
 
-  return { geminiApiKey, isLoading, refetch: fetchApiKey };
+  const clearApiKey = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setGeminiApiKey(null);
+  };
+
+  return { geminiApiKey, isLoading, saveApiKey, clearApiKey };
 }

@@ -46,7 +46,8 @@ async function callGeminiAPI(apiKey: string, message: string, history: any[]) {
     parts: [{ text: message }]
   });
 
-  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey, {
+  // Use gemini-1.5-flash which has better quota limits
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -113,11 +114,8 @@ serve(async (req) => {
     // Use user's Gemini API key as fallback
     if (useUserKey || !LOVABLE_API_KEY) {
       if (!userGeminiApiKey) {
-        const errorMsg = !LOVABLE_API_KEY 
-          ? 'AI service not configured. Please add your Gemini API key in Settings.'
-          : 'AI quota exceeded. Please add your Gemini API key in Settings to continue.';
         return new Response(
-          JSON.stringify({ error: errorMsg, needsApiKey: true }),
+          JSON.stringify({ error: 'AI quota exceeded. Please add your Gemini API key.', needsApiKey: true }),
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -132,12 +130,22 @@ serve(async (req) => {
       
       if (response?.status === 400 && errorText.includes('API_KEY_INVALID')) {
         return new Response(
-          JSON.stringify({ error: 'Invalid Gemini API key. Please check your API key in Settings.' }),
+          JSON.stringify({ error: 'Invalid Gemini API key. Please check your key.', invalidKey: true }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
-      throw new Error('AI service error');
+      if (response?.status === 429) {
+        return new Response(
+          JSON.stringify({ error: 'Gemini rate limit hit. Please wait a moment and try again.', rateLimited: true }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({ error: 'AI service error. Please try again.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const data = await response.json();
@@ -159,7 +167,7 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error('Chat error:', error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
+    return new Response(JSON.stringify({ error: 'Something went wrong. Please try again.' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
