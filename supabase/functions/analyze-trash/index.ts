@@ -75,7 +75,7 @@ serve(async (req) => {
   }
 
   try {
-    const { imageBase64 } = await req.json();
+    const { imageBase64, latitude, longitude } = await req.json();
     
     if (!imageBase64) {
       return new Response(
@@ -93,7 +93,13 @@ serve(async (req) => {
       );
     }
 
-    console.log('SnapTrash Vision AI: Analyzing image...');
+    // Build location context for localized guidance
+    let locationContext = '';
+    if (latitude && longitude) {
+      locationContext = `\n\nUser location coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}. If possible, provide disposal guidance relevant to this location's typical recycling infrastructure and regulations.`;
+    }
+
+    console.log('SnapTrash Vision AI: Analyzing image...', latitude ? `(with location: ${latitude}, ${longitude})` : '(no location)');
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -113,7 +119,7 @@ serve(async (req) => {
             content: [
               {
                 type: 'text',
-                text: 'Analyze this image and identify the waste item. Provide detailed classification and responsible disposal instructions. Remember: ALWAYS attempt identification unless the image is completely empty.'
+                text: `Analyze this image and identify the waste item. Provide detailed classification and responsible disposal instructions. Remember: ALWAYS attempt identification unless the image is completely empty.${locationContext}`
               },
               {
                 type: 'image_url',

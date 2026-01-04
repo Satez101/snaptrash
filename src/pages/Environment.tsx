@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import {
     Wind,
     Thermometer,
@@ -14,14 +15,18 @@ import {
     Shield,
     Leaf,
     Navigation,
+    ArrowLeft,
+    Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AirQuality {
     aqi: number;
@@ -58,35 +63,84 @@ interface EnvironmentResponse {
     error?: string;
 }
 
+interface CityResult {
+    name: string;
+    latitude: number;
+    longitude: number;
+    admin1?: string;
+    country?: string;
+}
+
 const Environment = () => {
+    const { profile, refreshProfile } = useAuth();
     const [locationPermission, setLocationPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
-    const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+    const [coords, setCoords] = useState<{ latitude: number; longitude: number; city?: string; state?: string } | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [environmentData, setEnvironmentData] = useState<EnvironmentData | null>(null);
     const [summary, setSummary] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [hasRequestedPermission, setHasRequestedPermission] = useState(false);
     const [isFetching, setIsFetching] = useState(false);
+    const [showCitySearch, setShowCitySearch] = useState(false);
+    const [cityQuery, setCityQuery] = useState("");
+    const [cityResults, setCityResults] = useState<CityResult[]>([]);
+    const [searchingCity, setSearchingCity] = useState(false);
 
-    // Check location permission status on mount
+    // Check for saved location in profile and permission status on mount
     useEffect(() => {
+        // Check if profile has saved location
+        if (profile?.latitude && profile?.longitude) {
+            setCoords({
+                latitude: profile.latitude,
+                longitude: profile.longitude,
+                city: profile.city || undefined,
+                state: profile.state || undefined,
+            });
+            setLocationPermission('granted');
+            setHasRequestedPermission(true);
+        }
+
         if (navigator.permissions) {
             navigator.permissions.query({ name: 'geolocation' }).then((result) => {
-                if (result.state === 'granted') {
+                if (result.state === 'granted' && !coords) {
                     setLocationPermission('granted');
                 } else if (result.state === 'denied') {
                     setLocationPermission('denied');
+                    setShowCitySearch(true);
                 }
             }).catch(() => {
                 // Fallback if permissions API is not supported
             });
         }
-    }, []);
+    }, [profile]);
+
+    // Save location to profile
+    const saveLocationToProfile = useCallback(async (location: { latitude: number; longitude: number; city?: string; state?: string }) => {
+        if (!profile?.user_id) return;
+
+        try {
+            await supabase
+                .from('profiles')
+                .update({
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    city: location.city || null,
+                    state: location.state || null,
+                    location_updated_at: new Date().toISOString(),
+                })
+                .eq('user_id', profile.user_id);
+            
+            await refreshProfile();
+        } catch (err) {
+            console.error('Error saving location:', err);
+        }
+    }, [profile?.user_id, refreshProfile]);
 
     const requestLocationPermission = useCallback(async () => {
         if (!navigator.geolocation) {
             setLocationPermission('denied');
             setError('Geolocation is not supported by your browser.');
+            setShowCitySearch(true);
             toast.error('Geolocation not supported');
             return;
         }
@@ -117,30 +171,79 @@ const Environment = () => {
                 );
             });
 
-            setCoords({
+            const newCoords = {
                 latitude: position.coords.latitude,
                 longitude: position.coords.longitude,
-            });
+            };
+            setCoords(newCoords);
             setLocationPermission('granted');
+            setShowCitySearch(false);
+            
+            // Save to profile
+            await saveLocationToProfile(newCoords);
+            
             toast.success('Location enabled successfully');
         } catch (err) {
             const error = err as GeolocationPositionError;
             if (error.code === error.PERMISSION_DENIED) {
                 setLocationPermission('denied');
-                setError('Location permission was denied. Please enable location access in your browser settings.');
+                setShowCitySearch(true);
+                setError('Location permission was denied. You can search for your city instead.');
                 toast.error('Location permission denied');
             } else if (error.code === error.POSITION_UNAVAILABLE) {
-                setError('Location information is unavailable. Please try again later.');
+                setShowCitySearch(true);
+                setError('Location information is unavailable. You can search for your city instead.');
                 toast.error('Location unavailable');
             } else if (error.code === error.TIMEOUT) {
-                setError('Location request timed out. Please try again.');
+                setShowCitySearch(true);
+                setError('Location request timed out. You can search for your city instead.');
                 toast.error('Location request timed out');
             } else {
-                setError('Failed to get your location. Please try again.');
+                setShowCitySearch(true);
+                setError('Failed to get your location. You can search for your city instead.');
                 toast.error('Failed to get location');
             }
         }
-    }, []);
+    }, [saveLocationToProfile]);
+
+    // City search functionality
+    const searchCity = useCallback(async () => {
+        if (!cityQuery.trim()) return;
+
+        setSearchingCity(true);
+        try {
+            const response = await fetch(
+                `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityQuery)}&count=5&language=en&format=json`
+            );
+            const data = await response.json();
+            setCityResults(data.results || []);
+        } catch (err) {
+            console.error("City search error:", err);
+            toast.error("Failed to search cities");
+        } finally {
+            setSearchingCity(false);
+        }
+    }, [cityQuery]);
+
+    const selectCity = useCallback(async (city: CityResult) => {
+        const newCoords = {
+            latitude: city.latitude,
+            longitude: city.longitude,
+            city: city.name,
+            state: city.admin1 || city.country,
+        };
+        setCoords(newCoords);
+        setLocationPermission('granted');
+        setHasRequestedPermission(true);
+        setShowCitySearch(false);
+        setCityResults([]);
+        setCityQuery("");
+
+        // Save to profile
+        await saveLocationToProfile(newCoords);
+
+        toast.success(`Location set to ${city.name}`);
+    }, [saveLocationToProfile]);
 
     const fetchEnvironmentData = useCallback(async () => {
         if (!coords) {
@@ -255,6 +358,15 @@ const Environment = () => {
     return (
         <div className="min-h-screen pt-24 pb-16 px-4 bg-gradient-hero">
             <div className="max-w-6xl mx-auto">
+                {/* Back Link */}
+                <Link
+                    to="/dashboard"
+                    className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8 opacity-0 animate-fade-in"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Back to Dashboard</span>
+                </Link>
+
                 {/* Hero Header - Always Visible */}
                 <div className="text-center mb-12 opacity-0 animate-fade-in" style={{ animationDelay: '0.1s' }}>
                     <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-primary mb-6 shadow-[0_0_40px_hsl(var(--primary)/0.3)]">
@@ -284,25 +396,109 @@ const Environment = () => {
                                 </div>
                             </CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="space-y-4">
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <Button
+                                    onClick={requestLocationPermission}
+                                    size="lg"
+                                    className="btn-gradient-eco gap-2"
+                                >
+                                    <Navigation className="w-5 h-5" />
+                                    Enable GPS Location
+                                </Button>
+                                <Button
+                                    onClick={() => setShowCitySearch(true)}
+                                    variant="outline"
+                                    size="lg"
+                                    className="gap-2"
+                                >
+                                    <Search className="w-5 h-5" />
+                                    Search City Instead
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* City Search Section */}
+                {showCitySearch && !coords && (
+                    <Card className="glass-card mb-8 opacity-0 animate-scale-in" style={{ animationDelay: '0.2s' }}>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                                    <Search className="w-6 h-6 text-primary" />
+                                </div>
+                                <div>
+                                    <div>Search Your City</div>
+                                    <CardDescription className="mt-1">
+                                        Enter your city name to get environmental insights
+                                    </CardDescription>
+                                </div>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Enter city name..."
+                                    value={cityQuery}
+                                    onChange={(e) => setCityQuery(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && searchCity()}
+                                    className="flex-1"
+                                />
+                                <Button onClick={searchCity} disabled={searchingCity} className="gap-2">
+                                    {searchingCity ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <Search className="w-4 h-4" />
+                                    )}
+                                    Search
+                                </Button>
+                            </div>
+                            
+                            {cityResults.length > 0 && (
+                                <div className="space-y-2">
+                                    {cityResults.map((city, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => selectCity(city)}
+                                            className="w-full text-left p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors border border-border/50"
+                                        >
+                                            <p className="font-medium text-foreground">{city.name}</p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {[city.admin1, city.country].filter(Boolean).join(', ')}
+                                            </p>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
                             <Button
+                                variant="ghost"
                                 onClick={requestLocationPermission}
-                                size="lg"
-                                className="w-full sm:w-auto btn-gradient-eco gap-2"
+                                className="w-full gap-2"
                             >
-                                <Navigation className="w-5 h-5" />
-                                Enable Live Location
+                                <Navigation className="w-4 h-4" />
+                                Try GPS Instead
                             </Button>
                         </CardContent>
                     </Card>
                 )}
 
-                {/* Location Denied Message */}
-                {locationPermission === 'denied' && (
+                {/* Location Denied Message with City Search Option */}
+                {locationPermission === 'denied' && !showCitySearch && !coords && (
                     <Alert className="glass-card border-yellow-500/50 bg-yellow-500/10 mb-8 opacity-0 animate-slide-up" style={{ animationDelay: '0.2s' }}>
                         <AlertCircle className="w-5 h-5 text-yellow-400" />
-                        <AlertDescription className="text-base">
-                            Location permission was denied. To use this feature, please enable location access in your browser settings and refresh the page.
+                        <AlertDescription className="text-base flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                            <span>Location permission was denied.</span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowCitySearch(true)}
+                                className="gap-2"
+                            >
+                                <Search className="w-4 h-4" />
+                                Search City Instead
+                            </Button>
                         </AlertDescription>
                     </Alert>
                 )}
@@ -315,30 +511,47 @@ const Environment = () => {
                                 <CheckCircle2 className="w-5 h-5 text-green-400" />
                             </div>
                             <div>
-                                <div className="text-sm font-medium">Location Enabled</div>
+                                <div className="text-sm font-medium">
+                                    {coords.city ? `${coords.city}${coords.state ? `, ${coords.state}` : ''}` : 'Location Enabled'}
+                                </div>
                                 <div className="text-xs text-muted-foreground">
                                     {coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)}
                                 </div>
                             </div>
                         </div>
-                        <Button
-                            onClick={fetchEnvironmentData}
-                            disabled={isLoading || isFetching}
-                            size="lg"
-                            className="w-full sm:w-auto btn-gradient-eco gap-2"
-                        >
-                            {isLoading || isFetching ? (
-                                <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    Fetching Data...
-                                </>
-                            ) : (
-                                <>
-                                    <RefreshCw className="w-5 h-5" />
-                                    Fetch Environmental Data
-                                </>
-                            )}
-                        </Button>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    setShowCitySearch(true);
+                                    setCoords(null);
+                                    setLocationPermission('prompt');
+                                    setEnvironmentData(null);
+                                    setSummary(null);
+                                }}
+                            >
+                                Change
+                            </Button>
+                            <Button
+                                onClick={fetchEnvironmentData}
+                                disabled={isLoading || isFetching}
+                                size="lg"
+                                className="flex-1 sm:flex-initial btn-gradient-eco gap-2"
+                            >
+                                {isLoading || isFetching ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        Fetching Data...
+                                    </>
+                                ) : (
+                                    <>
+                                        <RefreshCw className="w-5 h-5" />
+                                        {environmentData ? 'Refresh Data' : 'Fetch Data'}
+                                    </>
+                                )}
+                            </Button>
+                        </div>
                     </div>
                 )}
 

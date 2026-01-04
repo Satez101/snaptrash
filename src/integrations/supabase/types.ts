@@ -16,36 +16,57 @@ export type Database = {
     Tables: {
       profiles: {
         Row: {
+          city: string | null
           created_at: string
           eco_creds: number
           email: string
+          environment_cache: Json | null
+          environment_cache_updated_at: string | null
           id: string
+          latitude: number | null
+          location_updated_at: string | null
+          longitude: number | null
           name: string
           phone: string | null
+          state: string | null
           total_reports: number
           total_scans: number
           updated_at: string
           user_id: string
         }
         Insert: {
+          city?: string | null
           created_at?: string
           eco_creds?: number
           email: string
+          environment_cache?: Json | null
+          environment_cache_updated_at?: string | null
           id?: string
+          latitude?: number | null
+          location_updated_at?: string | null
+          longitude?: number | null
           name: string
           phone?: string | null
+          state?: string | null
           total_reports?: number
           total_scans?: number
           updated_at?: string
           user_id: string
         }
         Update: {
+          city?: string | null
           created_at?: string
           eco_creds?: number
           email?: string
+          environment_cache?: Json | null
+          environment_cache_updated_at?: string | null
           id?: string
+          latitude?: number | null
+          location_updated_at?: string | null
+          longitude?: number | null
           name?: string
           phone?: string | null
+          state?: string | null
           total_reports?: number
           total_scans?: number
           updated_at?: string

@@ -9,8 +9,8 @@ verify_jwt = false
 [functions.snaptrash-chat]
 verify_jwt = false
 
-[functions.environment-data]
+[functions.disposal-machines]
 verify_jwt = false
 
-[functions.disposal-machines]
+[functions.environment-insights]
 verify_jwt = false
