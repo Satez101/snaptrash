@@ -28,11 +28,10 @@ RULES:
 • Use 1-2 relevant emojis max
 • For disposal questions, mention SnapTrash machines in the app`;
 
-// Call AI with user's Gemini API key (direct Google API)
+// Call AI with user's Gemini API key
 async function callGeminiAPI(apiKey: string, message: string, history: any[], model: string = 'gemini-2.0-flash') {
   const contents = [];
   
-  // Add history
   for (const msg of (history || [])) {
     contents.push({
       role: msg.role === 'assistant' ? 'model' : 'user',
@@ -40,7 +39,6 @@ async function callGeminiAPI(apiKey: string, message: string, history: any[], mo
     });
   }
   
-  // Add current message
   contents.push({
     role: 'user',
     parts: [{ text: message }]
@@ -67,27 +65,6 @@ async function callGeminiAPI(apiKey: string, message: string, history: any[], mo
   return response;
 }
 
-// Call Lovable AI Gateway
-async function callLovableAPI(apiKey: string, message: string, history: any[]) {
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...(history || []),
-        { role: 'user', content: message }
-      ],
-    }),
-  });
-
-  return response;
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -95,49 +72,33 @@ serve(async (req) => {
 
   try {
     const { message, history, userGeminiApiKey, userGeminiModel } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+
+    if (!userGeminiApiKey) {
+      return new Response(
+        JSON.stringify({ error: 'Please add your Gemini API key in Settings.', needsApiKey: true }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const model = userGeminiModel || 'gemini-2.0-flash';
+    console.log('Using Gemini model:', model);
     
-    let response;
-    let useUserKey = false;
+    const response = await callGeminiAPI(userGeminiApiKey, message, history, model);
 
-    // Try Lovable AI first
-    if (LOVABLE_API_KEY) {
-      response = await callLovableAPI(LOVABLE_API_KEY, message, history);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Gemini API error:', response.status, errorText);
       
-      // If Lovable AI fails with 402 (quota) or 429 (rate limit), try user's key
-      if ((response.status === 402 || response.status === 429) && userGeminiApiKey) {
-        console.log('Lovable AI quota exceeded, falling back to user Gemini API key...');
-        useUserKey = true;
-      }
-    }
-
-    // Use user's Gemini API key as fallback
-    if (useUserKey || !LOVABLE_API_KEY) {
-      if (!userGeminiApiKey) {
+      if (response.status === 400 && errorText.includes('API_KEY_INVALID')) {
         return new Response(
-          JSON.stringify({ error: 'AI quota exceeded. Please add your Gemini API key.', needsApiKey: true }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      console.log('Using user Gemini API key with model:', userGeminiModel || 'gemini-2.0-flash');
-      response = await callGeminiAPI(userGeminiApiKey, message, history, userGeminiModel || 'gemini-2.0-flash');
-    }
-
-    if (!response || !response.ok) {
-      const errorText = response ? await response.text() : 'No response';
-      console.error('AI error:', response?.status, errorText);
-      
-      if (response?.status === 400 && errorText.includes('API_KEY_INVALID')) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid Gemini API key. Please check your key.', invalidKey: true }),
+          JSON.stringify({ error: 'Invalid API key. Please check your key in Settings.', invalidKey: true }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
-      if (response?.status === 429) {
+      if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: 'Gemini rate limit hit. Please wait a moment and try again.', rateLimited: true }),
+          JSON.stringify({ error: 'Rate limit hit. Please wait and try again.', rateLimited: true }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -149,18 +110,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    
-    // Handle different response formats
-    let content;
-    if (data.choices?.[0]?.message?.content) {
-      // Lovable AI format
-      content = data.choices[0].message.content;
-    } else if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      // Google Gemini API format
-      content = data.candidates[0].content.parts[0].text;
-    } else {
-      content = "I couldn't process that. Please try again.";
-    }
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't process that. Please try again.";
 
     return new Response(JSON.stringify({ response: content }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
