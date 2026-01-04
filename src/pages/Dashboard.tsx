@@ -3,7 +3,6 @@ import {
   Camera, 
   Trophy, 
   MapPin, 
-  Wind, 
   MessageCircle, 
   Trash2,
   Sparkles,
@@ -137,17 +136,6 @@ const Dashboard = () => {
             delay="0.35s"
           />
 
-          {/* Live Environment */}
-          <DashboardCard
-            to="/environment"
-            icon={<Wind className="w-8 h-8 text-secondary" />}
-            iconBg="bg-secondary/10"
-            title="Live Environment"
-            subtitle="AQI, solar & risk data"
-            badge="Real-time"
-            badgeColor="bg-secondary/10 text-secondary"
-            delay="0.35s"
-          />
 
           {/* SnapTrash Expert Chatbot */}
           <DashboardCard
