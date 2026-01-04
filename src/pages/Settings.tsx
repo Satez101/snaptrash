@@ -19,19 +19,19 @@ const Settings = () => {
     if (geminiModel) setSelectedModel(geminiModel);
   }, [geminiApiKey, geminiModel]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (inputKey.trim()) {
-      saveApiKey(inputKey.trim());
+      await saveApiKey(inputKey.trim());
     }
     saveModel(selectedModel);
     toast({
       title: "Settings saved",
-      description: "Your settings have been saved locally.",
+      description: "Your settings have been saved.",
     });
   };
 
-  const handleClear = () => {
-    clearApiKey();
+  const handleClear = async () => {
+    await clearApiKey();
     setInputKey("");
     toast({
       title: "API key removed",
@@ -167,7 +167,7 @@ const Settings = () => {
         {/* Info Card */}
         <div className="glass-card p-4 mt-6 opacity-0 animate-slide-up" style={{ animationDelay: '0.2s' }}>
           <p className="text-sm text-muted-foreground text-center">
-            Your settings are stored only in your browser - never sent to our servers.
+            Your API key is stored securely in your account.
           </p>
         </div>
       </div>

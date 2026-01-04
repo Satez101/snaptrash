@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
-const STORAGE_KEY = 'user_gemini_api_key';
 const MODEL_KEY = 'user_gemini_model';
 
 export const GEMINI_MODELS = [
@@ -13,20 +14,57 @@ export const GEMINI_MODELS = [
 export type GeminiModel = typeof GEMINI_MODELS[number]['id'];
 
 export function useUserGeminiKey() {
+  const { user } = useAuth();
   const [geminiApiKey, setGeminiApiKey] = useState<string | null>(null);
   const [geminiModel, setGeminiModel] = useState<GeminiModel>('gemini-2.0-flash');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedKey = localStorage.getItem(STORAGE_KEY);
-    const storedModel = localStorage.getItem(MODEL_KEY) as GeminiModel | null;
-    setGeminiApiKey(storedKey);
-    if (storedModel) setGeminiModel(storedModel);
-    setIsLoading(false);
-  }, []);
+    const fetchSettings = async () => {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
 
-  const saveApiKey = (key: string) => {
-    localStorage.setItem(STORAGE_KEY, key);
+      const { data } = await supabase
+        .from('user_settings')
+        .select('gemini_api_key')
+        .eq('user_id', user.id)
+        .single();
+
+      if (data?.gemini_api_key) {
+        setGeminiApiKey(data.gemini_api_key);
+      }
+
+      const storedModel = localStorage.getItem(MODEL_KEY) as GeminiModel | null;
+      if (storedModel) setGeminiModel(storedModel);
+      
+      setIsLoading(false);
+    };
+
+    fetchSettings();
+  }, [user]);
+
+  const saveApiKey = async (key: string) => {
+    if (!user) return;
+
+    const { data: existing } = await supabase
+      .from('user_settings')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (existing) {
+      await supabase
+        .from('user_settings')
+        .update({ gemini_api_key: key, updated_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+    } else {
+      await supabase
+        .from('user_settings')
+        .insert({ user_id: user.id, gemini_api_key: key });
+    }
+
     setGeminiApiKey(key);
   };
 
@@ -35,8 +73,14 @@ export function useUserGeminiKey() {
     setGeminiModel(model);
   };
 
-  const clearApiKey = () => {
-    localStorage.removeItem(STORAGE_KEY);
+  const clearApiKey = async () => {
+    if (!user) return;
+
+    await supabase
+      .from('user_settings')
+      .update({ gemini_api_key: null, updated_at: new Date().toISOString() })
+      .eq('user_id', user.id);
+
     setGeminiApiKey(null);
   };
 
