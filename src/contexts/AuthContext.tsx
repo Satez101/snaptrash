@@ -11,6 +11,11 @@ interface Profile {
   eco_creds: number;
   total_scans: number;
   total_reports: number;
+  latitude: number | null;
+  longitude: number | null;
+  city: string | null;
+  state: string | null;
+  location_updated_at: string | null;
 }
 
 interface AuthContextType {

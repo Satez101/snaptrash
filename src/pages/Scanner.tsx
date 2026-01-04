@@ -185,8 +185,13 @@ const Scanner = () => {
       setFeedbackGiven(false);
       
       try {
+        // Include location data for localized disposal guidance
         const { data, error } = await supabase.functions.invoke('analyze-trash', {
-          body: { imageBase64 }
+          body: { 
+            imageBase64,
+            latitude: coords?.latitude,
+            longitude: coords?.longitude,
+          }
         });
 
         if (error) {
