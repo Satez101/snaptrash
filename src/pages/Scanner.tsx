@@ -20,12 +20,29 @@ import {
   AlertTriangle,
   CheckCircle2,
   HelpCircle,
+  Cpu,
+  Zap,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
+
+interface MachineDisposalStep {
+  step: number;
+  action: string;
+  slot: string;
+  tip?: string;
+}
+
+interface MaterialBreakdown {
+  material: string;
+  slot: string;
+  action: string;
+}
 
 interface ScanResult {
   category: string;
@@ -35,6 +52,8 @@ interface ScanResult {
   impact: string;
   recyclable: boolean;
   confidence?: number;
+  machineDisposalSteps?: MachineDisposalStep[];
+  materialBreakdown?: MaterialBreakdown[];
 }
 
 interface LocationCoords {
@@ -184,6 +203,8 @@ const Scanner = () => {
           impact: data.impact,
           recyclable: data.recyclable,
           confidence: data.confidence,
+          machineDisposalSteps: data.machineDisposalSteps,
+          materialBreakdown: data.materialBreakdown,
         });
       } catch (err) {
         console.error('Error:', err);
@@ -393,28 +414,83 @@ const Scanner = () => {
 
               {/* Disposal Instructions - Enhanced */}
               <div className="space-y-4">
+                {/* AI-Generated Machine Disposal Steps */}
+                {scanResult.machineDisposalSteps && scanResult.machineDisposalSteps.length > 0 && nearbyMachines.length > 0 && (
+                  <motion.div 
+                    className="p-5 rounded-xl bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/30"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                        <Cpu className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                          Use SnapTrash Machine
+                          <span className="px-2 py-0.5 rounded-full bg-accent/20 text-accent text-xs">AI Guided</span>
+                        </h4>
+                        <p className="text-xs text-muted-foreground">Follow these steps at any nearby SmartStation</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {scanResult.machineDisposalSteps.map((step, index) => (
+                        <motion.div 
+                          key={step.step}
+                          className="flex items-start gap-3 p-3 rounded-lg bg-background/50"
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                        >
+                          <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-bold text-primary">{step.step}</span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">{step.action}</p>
+                            {step.slot !== "N/A" && (
+                              <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-accent/10 text-accent text-xs">
+                                <ArrowRight className="w-3 h-3" />
+                                {step.slot}
+                              </span>
+                            )}
+                            {step.tip && (
+                              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                <Zap className="w-3 h-3 text-warning" />
+                                {step.tip}
+                              </p>
+                            )}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    {/* Material Breakdown for mixed waste */}
+                    {scanResult.materialBreakdown && scanResult.materialBreakdown.length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-border/30">
+                        <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          Material Breakdown (Mixed Waste)
+                        </p>
+                        <div className="space-y-2">
+                          {scanResult.materialBreakdown.map((mat, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs p-2 rounded-lg bg-muted/30">
+                              <span className="text-foreground">{mat.material}</span>
+                              <span className="text-accent">{mat.slot}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
                 <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
                   <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                     <Trash2 className="w-4 h-4 text-primary" />
-                    How to Dispose
+                    General Disposal Guide
                   </h4>
                   <p className="text-foreground text-sm leading-relaxed">{scanResult.disposal}</p>
-                  
-                  {/* Quick disposal steps */}
-                  <div className="mt-4 pt-4 border-t border-border/50">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                      <span className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">1</span>
-                      Clean the item if possible
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                      <span className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">2</span>
-                      {scanResult.recyclable ? "Place in recycling bin" : "Place in general waste"}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">3</span>
-                      Check local guidelines for specifics
-                    </div>
-                  </div>
                 </div>
 
                 <div className="p-4 rounded-xl bg-accent/5 border border-accent/20">

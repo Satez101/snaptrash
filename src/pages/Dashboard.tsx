@@ -8,7 +8,8 @@ import {
   Sparkles,
   ArrowRight,
   Gift,
-  Wind
+  Wind,
+  Cpu
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -125,15 +126,15 @@ const Dashboard = () => {
             delay="0.3s"
           />
 
-          {/* Disposal Machines */}
+          {/* SnapTrash Machines */}
           <DashboardCard
             to="/machines"
-            icon={<MapPin className="w-8 h-8 text-[hsl(var(--eco-earth))]" />}
-            iconBg="bg-[hsl(var(--eco-earth)/0.1)]"
-            title="Disposal Machines"
-            subtitle="Find nearby SnapTrash machines"
-            badge="Near You"
-            badgeColor="bg-[hsl(var(--eco-earth)/0.1)] text-[hsl(var(--eco-earth))]"
+            icon={<Cpu className="w-8 h-8 text-[hsl(var(--eco-water))]" />}
+            iconBg="bg-[hsl(var(--eco-water)/0.1)]"
+            title="SnapTrash Machines"
+            subtitle="Turn real-world waste into SnapCreds"
+            badge="SmartStations"
+            badgeColor="bg-[hsl(var(--eco-water)/0.1)] text-[hsl(var(--eco-water))]"
             delay="0.35s"
           />
 

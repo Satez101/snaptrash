@@ -41,14 +41,55 @@ Your response MUST be a valid JSON object with this EXACT structure:
   "tips": "string (one practical eco-friendly suggestion related to this waste type)",
   "impact": "string (clear environmental impact in simple terms - what happens if improperly disposed)",
   "recyclable": boolean (true if item can be recycled through standard recycling, false if needs special handling),
-  "confidence": number (0.0 to 1.0 - be honest about certainty)
+  "confidence": number (0.0 to 1.0 - be honest about certainty),
+  "machineDisposalSteps": [
+    {
+      "step": number,
+      "action": "string (short action description)",
+      "slot": "string (which bin/slot to use: 'Recyclable', 'Organic', 'E-Waste', 'General Waste')",
+      "tip": "string (optional helpful hint)"
+    }
+  ],
+  "materialBreakdown": [
+    {
+      "material": "string (e.g., 'Plastic wrapper', 'Paper label', 'Metal cap')",
+      "slot": "string (correct disposal slot for this component)",
+      "action": "string (what to do with this part)"
+    }
+  ]
+}
+
+MACHINE DISPOSAL STEPS GUIDELINES:
+- Generate 2-4 clear, actionable steps for disposing the item at a SnapTrash SmartStation
+- Each step should be specific and helpful
+- Include the correct slot/bin for each component
+- If the item has multiple materials, break them down separately
+- Be encouraging and friendly in tone
+
+EXAMPLE for a plastic bottle:
+{
+  "machineDisposalSteps": [
+    {"step": 1, "action": "Remove the bottle cap", "slot": "Recyclable", "tip": "Caps are often a different plastic type"},
+    {"step": 2, "action": "Empty any remaining liquid", "slot": "N/A", "tip": "Dry containers recycle better"},
+    {"step": 3, "action": "Crush the bottle to save space", "slot": "Recyclable", "tip": "Crushed bottles = more room for others"},
+    {"step": 4, "action": "Drop in the Recyclable slot", "slot": "Recyclable", "tip": "You just earned SnapCreds! 🎉"}
+  ]
+}
+
+EXAMPLE for coffee cup with lid:
+{
+  "materialBreakdown": [
+    {"material": "Plastic lid", "slot": "Recyclable", "action": "Remove and recycle separately"},
+    {"material": "Paper cup (wax-coated)", "slot": "General Waste", "action": "Cannot be recycled due to coating"},
+    {"material": "Cardboard sleeve", "slot": "Recyclable", "action": "Can be recycled if clean"}
+  ]
 }
 
 CONFIDENCE HANDLING:
 - High confidence (0.85-1.0): Clear, well-lit object that you can identify with certainty
 - Medium confidence (0.6-0.84): Partially visible or slightly unclear, but you can make a reasonable identification
-- Low confidence (0.3-0.59): Poor image quality but you can still attempt identification - add disclaimer in disposal field like "Based on visible features, this appears to be..."
-- Only return success: false if confidence would be below 0.3 (image is completely empty, blurry beyond recognition, or shows nothing waste-related)
+- Low confidence (0.3-0.59): Poor image quality but you can still attempt identification - add disclaimer in disposal field
+- Only return success: false if confidence would be below 0.3
 
 ONLY return success: false when the image is COMPLETELY UNUSABLE:
 {
@@ -56,18 +97,7 @@ ONLY return success: false when the image is COMPLETELY UNUSABLE:
   "error": "Unable to identify - the image appears to be completely empty or contains no visible objects. Please capture a photo of the item you'd like to identify."
 }
 
-EXAMPLES OF WHAT TO ALWAYS IDENTIFY (never refuse):
-- Headphones/earbuds → E-Waste
-- Phone charger/cable → E-Waste
-- Remote control → E-Waste
-- Plastic bottle → Plastic
-- Coffee cup → Mixed Waste (paper cup + plastic lid)
-- Pizza box with grease → Mixed Waste (contaminated paper)
-- Banana peel → Organic
-- Broken electronics → E-Waste
-- Clothing items → Textile
-
-Your goal is to HELP USERS ACT, not to reject their input. Always provide actionable disposal guidance.`;
+Your goal is to HELP USERS ACT, not to reject their input. Always provide actionable disposal guidance that works with SnapTrash Machines.`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -96,7 +126,7 @@ serve(async (req) => {
     // Build location context for localized guidance
     let locationContext = '';
     if (latitude && longitude) {
-      locationContext = `\n\nUser location coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}. If possible, provide disposal guidance relevant to this location's typical recycling infrastructure and regulations.`;
+      locationContext = `\n\nUser location coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}. There are SnapTrash SmartStations nearby. Provide disposal guidance optimized for using these machines, including step-by-step instructions for the machine interface.`;
     }
 
     console.log('SnapTrash Vision AI: Analyzing image...', latitude ? `(with location: ${latitude}, ${longitude})` : '(no location)');
@@ -119,7 +149,7 @@ serve(async (req) => {
             content: [
               {
                 type: 'text',
-                text: `Analyze this image and identify the waste item. Provide detailed classification and responsible disposal instructions. Remember: ALWAYS attempt identification unless the image is completely empty.${locationContext}`
+                text: `Analyze this image and identify the waste item. Provide detailed classification, responsible disposal instructions, AND step-by-step guidance for using a SnapTrash Machine to dispose of it correctly. Remember: ALWAYS attempt identification unless the image is completely empty.${locationContext}`
               },
               {
                 type: 'image_url',
@@ -203,6 +233,20 @@ serve(async (req) => {
         result.impact = result.impact || 'Improper disposal can contribute to landfill overflow and environmental pollution.';
         result.recyclable = result.recyclable ?? false;
         result.confidence = typeof result.confidence === 'number' ? Math.min(1, Math.max(0, result.confidence)) : 0.7;
+        
+        // Ensure machineDisposalSteps exists with defaults
+        if (!result.machineDisposalSteps || !Array.isArray(result.machineDisposalSteps)) {
+          result.machineDisposalSteps = [
+            { step: 1, action: "Identify the waste category", slot: result.recyclable ? "Recyclable" : "General Waste", tip: "Check the label if unsure" },
+            { step: 2, action: "Clean the item if possible", slot: "N/A", tip: "Dry items recycle better" },
+            { step: 3, action: `Drop in the ${result.recyclable ? "Recyclable" : "General Waste"} slot`, slot: result.recyclable ? "Recyclable" : "General Waste", tip: "You earned SnapCreds! 🎉" }
+          ];
+        }
+        
+        // Ensure materialBreakdown exists for mixed waste
+        if (result.category === 'Mixed Waste' && (!result.materialBreakdown || !Array.isArray(result.materialBreakdown))) {
+          result.materialBreakdown = [];
+        }
       }
       
     } catch (parseError) {
@@ -219,7 +263,13 @@ serve(async (req) => {
           tips: 'When in doubt, check your local recycling guidelines or contact waste management.',
           impact: 'Proper disposal prevents environmental contamination and supports recycling efforts.',
           recyclable: false,
-          confidence: 0.4
+          confidence: 0.4,
+          machineDisposalSteps: [
+            { step: 1, action: "Check item for recycling symbols", slot: "N/A", tip: "Look for ♻️ symbols" },
+            { step: 2, action: "When unsure, use General Waste", slot: "General Waste", tip: "Better safe than contaminating recycling" },
+            { step: 3, action: "Ask a SnapTrash attendant if available", slot: "N/A", tip: "They're happy to help!" }
+          ],
+          materialBreakdown: []
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
