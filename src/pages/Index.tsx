@@ -43,9 +43,9 @@ const Index = () => {
 
           {/* Quote */}
           <p className="text-xl md:text-2xl text-foreground/90 font-light mb-4 opacity-0 animate-slide-up" style={{ animationDelay: '0.2s' }}>
-            "The world doesn't need heroes.
+            "Every trash has a story.
             <br />
-            <span className="gradient-text-accent font-medium">It needs people who act.</span>"
+            <span className="gradient-text-accent font-medium">Be the hero who ends it.</span>"
           </p>
 
           {/* Supporting Text */}
