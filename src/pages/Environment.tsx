@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import {
   ArrowLeft,
   Wind,
-  Thermometer,
   Droplets,
   Factory,
   MapPin,
@@ -12,8 +11,14 @@ import {
   Search,
   Navigation,
   Sparkles,
-  CloudSun,
-  AlertCircle,
+  Waves,
+  Lightbulb,
+  ChevronLeft,
+  ChevronRight,
+  Heart,
+  TreePine,
+  Recycle,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +27,13 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 // Types
 interface LocationData {
@@ -38,6 +50,7 @@ interface AirQualityData {
   pm25: number | null;
   pm10: number | null;
   source: string | null;
+  healthImpact: string;
   available: boolean;
   message?: string;
 }
@@ -52,11 +65,36 @@ interface WeatherData {
   message?: string;
 }
 
+interface WaterBodyData {
+  list: Array<{ name: string; type: string }>;
+  pollutionLevel: string;
+  pollutionReasons: string[];
+  description: string;
+  available: boolean;
+}
+
+interface IndustrialData {
+  list: Array<{ name: string; type: string }>;
+  pollutionTypes: string[];
+  impactLevel: string;
+  description: string;
+  available: boolean;
+}
+
+interface SolutionsData {
+  citizenActions: string[];
+  initiatives: string[];
+  snaptrashActions: string[];
+}
+
 interface EnvironmentResponse {
   success: boolean;
   location: LocationData | null;
   airQuality: AirQualityData;
   weather: WeatherData;
+  waterBodies: WaterBodyData;
+  industrial: IndustrialData;
+  solutions: SolutionsData;
   summary: string;
   fetchedAt: string;
   error?: string;
@@ -81,18 +119,40 @@ interface UserCoords {
 // Helper functions
 const getAqiColor = (aqi: number | null) => {
   if (aqi === null) return "text-muted-foreground";
-  if (aqi <= 50) return "text-[hsl(142,76%,36%)]";
-  if (aqi <= 100) return "text-[hsl(48,96%,53%)]";
-  if (aqi <= 150) return "text-[hsl(25,95%,53%)]";
-  return "text-[hsl(0,84%,60%)]";
+  if (aqi <= 50) return "text-[hsl(var(--aqi-good))]";
+  if (aqi <= 100) return "text-[hsl(var(--aqi-moderate))]";
+  if (aqi <= 150) return "text-[hsl(var(--aqi-unhealthy-sensitive))]";
+  if (aqi <= 200) return "text-[hsl(var(--aqi-unhealthy))]";
+  if (aqi <= 300) return "text-[hsl(var(--aqi-very-unhealthy))]";
+  return "text-[hsl(var(--aqi-hazardous))]";
 };
 
 const getAqiBg = (aqi: number | null) => {
   if (aqi === null) return "bg-muted/30";
-  if (aqi <= 50) return "bg-[hsl(142,76%,36%,0.1)]";
-  if (aqi <= 100) return "bg-[hsl(48,96%,53%,0.1)]";
-  if (aqi <= 150) return "bg-[hsl(25,95%,53%,0.1)]";
-  return "bg-[hsl(0,84%,60%,0.1)]";
+  if (aqi <= 50) return "bg-[hsl(var(--aqi-good)/0.15)]";
+  if (aqi <= 100) return "bg-[hsl(var(--aqi-moderate)/0.15)]";
+  if (aqi <= 150) return "bg-[hsl(var(--aqi-unhealthy-sensitive)/0.15)]";
+  if (aqi <= 200) return "bg-[hsl(var(--aqi-unhealthy)/0.15)]";
+  if (aqi <= 300) return "bg-[hsl(var(--aqi-very-unhealthy)/0.15)]";
+  return "bg-[hsl(var(--aqi-hazardous)/0.15)]";
+};
+
+const getPollutionLevelColor = (level: string) => {
+  switch (level.toLowerCase()) {
+    case 'low': return 'text-[hsl(var(--aqi-good))]';
+    case 'medium': return 'text-[hsl(var(--aqi-moderate))]';
+    case 'high': return 'text-[hsl(var(--aqi-unhealthy))]';
+    default: return 'text-muted-foreground';
+  }
+};
+
+const getPollutionLevelBg = (level: string) => {
+  switch (level.toLowerCase()) {
+    case 'low': return 'bg-[hsl(var(--aqi-good)/0.15)]';
+    case 'medium': return 'bg-[hsl(var(--aqi-moderate)/0.15)]';
+    case 'high': return 'bg-[hsl(var(--aqi-unhealthy)/0.15)]';
+    default: return 'bg-muted/30';
+  }
 };
 
 const Environment = () => {
@@ -146,7 +206,7 @@ const Environment = () => {
     }
   }, [profile?.user_id, refreshProfile]);
 
-  // Request GPS location
+  // Request GPS location with high accuracy
   const requestGPSLocation = useCallback(async () => {
     if (!navigator.geolocation) {
       toast.error("GPS not supported in this browser");
@@ -159,9 +219,9 @@ const Environment = () => {
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: false,
-          timeout: 10000,
-          maximumAge: 300000,
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
         });
       });
 
@@ -175,7 +235,7 @@ const Environment = () => {
       setShowCitySearch(false);
       
       await saveLocationToProfile(newCoords);
-      toast.success("Location enabled");
+      toast.success("Location enabled with high accuracy");
     } catch (err) {
       setLocationStatus('denied');
       setShowCitySearch(true);
@@ -243,7 +303,7 @@ const Environment = () => {
 
       setEnvData(data);
       setLastFetchTime(new Date().toLocaleTimeString());
-      toast.success("Environment data loaded!");
+      toast.success("Environmental data loaded!");
     } catch (err) {
       console.error('Fetch error:', err);
       toast.error("Failed to fetch environmental data");
@@ -281,11 +341,11 @@ const Environment = () => {
             <span className="gradient-text-eco">Environment Intelligence</span>
           </h1>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            Real-time air quality, weather, and environmental insights for your location
+            Real-time environmental insights for your location - swipe through the cards to explore
           </p>
         </div>
 
-        {/* Location Setup - Only show if no coords */}
+        {/* Location Setup */}
         {!coords && (
           <div className="glass-card p-8 mb-8 animate-fade-in">
             {!showCitySearch ? (
@@ -296,7 +356,7 @@ const Environment = () => {
                 <div>
                   <h3 className="font-semibold text-xl text-foreground mb-2">Enable Location</h3>
                   <p className="text-muted-foreground">
-                    We need your location to show environmental data for your area
+                    We need your precise location to show environmental data for your area
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -369,7 +429,7 @@ const Environment = () => {
           </div>
         )}
 
-        {/* Location Card - Show when we have coords */}
+        {/* Location Card */}
         {coords && (
           <div className="glass-card p-6 mb-6 animate-fade-in">
             <div className="flex items-center justify-between flex-wrap gap-4">
@@ -410,182 +470,308 @@ const Environment = () => {
 
         {/* Loading Skeleton */}
         {isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="glass-card p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <Skeleton className="w-12 h-12 rounded-xl" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-5 w-32" />
-                    <Skeleton className="h-4 w-24" />
-                  </div>
-                </div>
-                <Skeleton className="h-20 w-full rounded-xl" />
-              </div>
-            ))}
+          <div className="space-y-6 animate-fade-in">
+            <Skeleton className="h-[400px] w-full rounded-2xl" />
+            <div className="flex justify-center gap-2">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="w-3 h-3 rounded-full" />
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Environment Data Cards */}
+        {/* Flashcards Carousel */}
         {envData && !isLoading && (
-          <div className="space-y-6 animate-fade-in">
-            {/* AI Summary Card */}
-            <div className="glass-card p-6 border-l-4 border-primary">
+          <div className="animate-fade-in">
+            {/* AI Summary */}
+            <div className="glass-card p-6 mb-6 border-l-4 border-primary">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Sparkles className="w-6 h-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground mb-2">AI Summary</h3>
+                  <h3 className="font-semibold text-foreground mb-2">AI Environmental Summary</h3>
                   <p className="text-muted-foreground leading-relaxed">{envData.summary}</p>
-                  <p className="text-xs text-muted-foreground/60 mt-2">
-                    AI-generated based on real data from your location
-                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Data Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Air Quality Card */}
-              <div className="glass-card p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", getAqiBg(envData.airQuality.aqi))}>
-                    <Wind className={cn("w-6 h-6", getAqiColor(envData.airQuality.aqi))} />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">Air Quality</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {envData.airQuality.available ? envData.airQuality.category : 'No Data'}
-                    </p>
-                  </div>
-                </div>
-
-                {envData.airQuality.available && envData.airQuality.aqi !== null ? (
-                  <div className="space-y-4">
-                    <div className={cn("text-center py-4 rounded-xl", getAqiBg(envData.airQuality.aqi))}>
-                      <p className={cn("font-display text-5xl font-bold", getAqiColor(envData.airQuality.aqi))}>
-                        {envData.airQuality.aqi}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">AQI Index</p>
+            {/* Swipeable Flashcards */}
+            <Carousel className="w-full" opts={{ align: "start", loop: true }}>
+              <CarouselContent className="-ml-4">
+                {/* Flashcard 1: Air Quality */}
+                <CarouselItem className="pl-4 basis-full md:basis-1/2 lg:basis-1/2">
+                  <div className="glass-card p-6 h-[420px] flex flex-col">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center", getAqiBg(envData.airQuality.aqi))}>
+                        <Wind className={cn("w-7 h-7", getAqiColor(envData.airQuality.aqi))} />
+                      </div>
+                      <div>
+                        <h3 className="font-display text-xl font-bold text-foreground">Air Quality</h3>
+                        <p className="text-sm text-muted-foreground">Real-time AQI monitoring</p>
+                      </div>
                     </div>
-                    
-                    {(envData.airQuality.pm25 || envData.airQuality.pm10) && (
-                      <div className="grid grid-cols-2 gap-2 text-center">
-                        {envData.airQuality.pm25 !== null && (
-                          <div className="p-3 rounded-lg bg-muted/30">
-                            <p className="font-semibold text-foreground">{envData.airQuality.pm25}</p>
-                            <p className="text-xs text-muted-foreground">PM2.5 µg/m³</p>
+
+                    {envData.airQuality.available && envData.airQuality.aqi !== null ? (
+                      <div className="flex-1 flex flex-col">
+                        <div className={cn("text-center py-6 rounded-2xl mb-4", getAqiBg(envData.airQuality.aqi))}>
+                          <p className={cn("font-display text-6xl font-bold", getAqiColor(envData.airQuality.aqi))}>
+                            {envData.airQuality.aqi}
+                          </p>
+                          <p className={cn("text-lg font-semibold mt-1", getAqiColor(envData.airQuality.aqi))}>
+                            {envData.airQuality.category}
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-3 flex-1">
+                          <div className="flex items-start gap-2 p-3 rounded-xl bg-muted/20">
+                            <Heart className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-muted-foreground">{envData.airQuality.healthImpact}</p>
                           </div>
-                        )}
-                        {envData.airQuality.pm10 !== null && (
-                          <div className="p-3 rounded-lg bg-muted/30">
-                            <p className="font-semibold text-foreground">{envData.airQuality.pm10}</p>
-                            <p className="text-xs text-muted-foreground">PM10 µg/m³</p>
-                          </div>
-                        )}
+                          
+                          {(envData.airQuality.pm25 || envData.airQuality.pm10) && (
+                            <div className="grid grid-cols-2 gap-2">
+                              {envData.airQuality.pm25 !== null && (
+                                <div className="p-3 rounded-lg bg-muted/30 text-center">
+                                  <p className="font-semibold text-foreground">{envData.airQuality.pm25}</p>
+                                  <p className="text-xs text-muted-foreground">PM2.5 µg/m³</p>
+                                </div>
+                              )}
+                              {envData.airQuality.pm10 !== null && (
+                                <div className="p-3 rounded-lg bg-muted/30 text-center">
+                                  <p className="font-semibold text-foreground">{envData.airQuality.pm10}</p>
+                                  <p className="text-xs text-muted-foreground">PM10 µg/m³</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center">
+                        <div className="text-center py-8">
+                          <AlertTriangle className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+                          <p className="text-muted-foreground">
+                            {envData.airQuality.message || 'No monitoring stations nearby'}
+                          </p>
+                        </div>
                       </div>
                     )}
-                    
-                    {envData.airQuality.source && (
-                      <p className="text-xs text-muted-foreground text-center">
-                        Source: {envData.airQuality.source}
-                      </p>
-                    )}
                   </div>
-                ) : (
-                  <div className="text-center py-8 bg-muted/20 rounded-xl">
-                    <AlertCircle className="w-10 h-10 text-muted-foreground mx-auto mb-2 opacity-50" />
-                    <p className="text-sm text-muted-foreground">
-                      {envData.airQuality.message || 'No monitoring stations nearby'}
-                    </p>
-                  </div>
-                )}
-              </div>
+                </CarouselItem>
 
-              {/* Weather Card */}
-              <div className="glass-card p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-[hsl(var(--eco-solar)/0.1)] flex items-center justify-center">
-                    <CloudSun className="w-6 h-6 text-[hsl(var(--eco-solar))]" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">Weather</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {envData.weather.available ? envData.weather.description : 'No Data'}
-                    </p>
-                  </div>
-                </div>
-
-                {envData.weather.available ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="text-center p-4 rounded-xl bg-muted/30">
-                        <Thermometer className="w-5 h-5 text-[hsl(var(--eco-solar))] mx-auto mb-1" />
-                        <p className="font-display text-2xl font-bold text-foreground">
-                          {envData.weather.temperature}°C
-                        </p>
-                        <p className="text-xs text-muted-foreground">Temperature</p>
+                {/* Flashcard 2: Industrial Pollution */}
+                <CarouselItem className="pl-4 basis-full md:basis-1/2 lg:basis-1/2">
+                  <div className="glass-card p-6 h-[420px] flex flex-col">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-14 h-14 rounded-2xl bg-[hsl(var(--eco-earth)/0.15)] flex items-center justify-center">
+                        <Factory className="w-7 h-7 text-[hsl(var(--eco-earth))]" />
                       </div>
-                      <div className="text-center p-4 rounded-xl bg-muted/30">
-                        <Droplets className="w-5 h-5 text-[hsl(var(--eco-water))] mx-auto mb-1" />
-                        <p className="font-display text-2xl font-bold text-foreground">
-                          {envData.weather.humidity}%
-                        </p>
-                        <p className="text-xs text-muted-foreground">Humidity</p>
+                      <div>
+                        <h3 className="font-display text-xl font-bold text-foreground">Industrial Pollution</h3>
+                        <p className="text-sm text-muted-foreground">Nearby industrial zones</p>
                       </div>
                     </div>
-                    
-                    <div className="p-3 rounded-lg bg-primary/5 text-center">
-                      <p className="text-sm text-muted-foreground">
-                        Feels like <span className="font-semibold text-foreground">{envData.weather.feelsLike}°C</span>
-                        {' • '}Wind <span className="font-semibold text-foreground">{envData.weather.windSpeed} km/h</span>
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 bg-muted/20 rounded-xl">
-                    <AlertCircle className="w-10 h-10 text-muted-foreground mx-auto mb-2 opacity-50" />
-                    <p className="text-sm text-muted-foreground">
-                      {envData.weather.message || 'Weather data unavailable'}
-                    </p>
-                  </div>
-                )}
-              </div>
 
-              {/* Area Type Card */}
-              {envData.location && (
-                <div className="glass-card p-6 md:col-span-2">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 rounded-xl bg-[hsl(var(--eco-earth)/0.1)] flex items-center justify-center">
-                      <Factory className="w-6 h-6 text-[hsl(var(--eco-earth))]" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground">Local Environment Context</h3>
-                      <p className="text-sm text-muted-foreground">AI-assisted classification</p>
+                    <div className="flex-1 flex flex-col">
+                      {/* Impact Level Badge */}
+                      <div className={cn("text-center py-4 rounded-2xl mb-4", getPollutionLevelBg(envData.industrial.impactLevel))}>
+                        <p className={cn("font-display text-3xl font-bold", getPollutionLevelColor(envData.industrial.impactLevel))}>
+                          {envData.industrial.impactLevel}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">Environmental Impact</p>
+                      </div>
+
+                      {/* Pollution Types */}
+                      {envData.industrial.pollutionTypes.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {envData.industrial.pollutionTypes.map((type, idx) => (
+                            <span key={idx} className="px-3 py-1.5 rounded-full bg-[hsl(var(--eco-earth)/0.1)] text-sm text-[hsl(var(--eco-earth))] font-medium">
+                              {type}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Industrial Sites List */}
+                      {envData.industrial.list.length > 0 ? (
+                        <div className="space-y-2 flex-1 overflow-y-auto max-h-32">
+                          {envData.industrial.list.slice(0, 3).map((site, idx) => (
+                            <div key={idx} className="p-3 rounded-lg bg-muted/20 flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-muted/40 flex items-center justify-center">
+                                <Factory className="w-4 h-4 text-muted-foreground" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-foreground text-sm truncate">{site.name}</p>
+                                <p className="text-xs text-muted-foreground">{site.type}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No major industrial zones detected within 10km
+                        </p>
+                      )}
+
+                      {/* Description */}
+                      <div className="mt-auto pt-4">
+                        <p className="text-sm text-muted-foreground">{envData.industrial.description}</p>
+                      </div>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/30">
-                    <div className="w-16 h-16 rounded-xl bg-[hsl(var(--eco-earth)/0.1)] flex items-center justify-center">
-                      <span className="font-display text-xl font-bold text-[hsl(var(--eco-earth))]">
-                        {envData.location.areaType.charAt(0)}
-                      </span>
+                </CarouselItem>
+
+                {/* Flashcard 3: Water Bodies */}
+                <CarouselItem className="pl-4 basis-full md:basis-1/2 lg:basis-1/2">
+                  <div className="glass-card p-6 h-[420px] flex flex-col">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-14 h-14 rounded-2xl bg-[hsl(var(--eco-water)/0.15)] flex items-center justify-center">
+                        <Waves className="w-7 h-7 text-[hsl(var(--eco-water))]" />
+                      </div>
+                      <div>
+                        <h3 className="font-display text-xl font-bold text-foreground">Water Bodies</h3>
+                        <p className="text-sm text-muted-foreground">Rivers & lakes nearby</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-lg text-foreground">{envData.location.areaType} Zone</p>
-                      <p className="text-sm text-muted-foreground">
-                        Based on OpenStreetMap land use classification
-                      </p>
+
+                    <div className="flex-1 flex flex-col">
+                      {/* Pollution Level Badge */}
+                      <div className={cn("text-center py-4 rounded-2xl mb-4", getPollutionLevelBg(envData.waterBodies.pollutionLevel))}>
+                        <p className={cn("font-display text-3xl font-bold", getPollutionLevelColor(envData.waterBodies.pollutionLevel))}>
+                          {envData.waterBodies.pollutionLevel}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">Estimated Pollution Level</p>
+                      </div>
+
+                      {/* Pollution Reasons */}
+                      {envData.waterBodies.pollutionReasons.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {envData.waterBodies.pollutionReasons.map((reason, idx) => (
+                            <span key={idx} className="px-3 py-1.5 rounded-full bg-[hsl(var(--eco-water)/0.1)] text-sm text-[hsl(var(--eco-water))] font-medium">
+                              {reason}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Water Bodies List */}
+                      {envData.waterBodies.list.length > 0 ? (
+                        <div className="space-y-2 flex-1 overflow-y-auto max-h-32">
+                          {envData.waterBodies.list.slice(0, 3).map((water, idx) => (
+                            <div key={idx} className="p-3 rounded-lg bg-muted/20 flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-muted/40 flex items-center justify-center">
+                                <Droplets className="w-4 h-4 text-[hsl(var(--eco-water))]" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-foreground text-sm truncate">{water.name}</p>
+                                <p className="text-xs text-muted-foreground">{water.type}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No major water bodies detected within 10km
+                        </p>
+                      )}
+
+                      {/* Description */}
+                      <div className="mt-auto pt-4">
+                        <p className="text-sm text-muted-foreground">{envData.waterBodies.description}</p>
+                      </div>
                     </div>
                   </div>
+                </CarouselItem>
+
+                {/* Flashcard 4: Environmental Solutions */}
+                <CarouselItem className="pl-4 basis-full md:basis-1/2 lg:basis-1/2">
+                  <div className="glass-card p-6 h-[420px] flex flex-col">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-14 h-14 rounded-2xl bg-primary/15 flex items-center justify-center">
+                        <Lightbulb className="w-7 h-7 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-display text-xl font-bold text-foreground">Take Action</h3>
+                        <p className="text-sm text-muted-foreground">Solutions & initiatives</p>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 space-y-4 overflow-y-auto">
+                      {/* Citizen Actions */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <TreePine className="w-4 h-4 text-[hsl(var(--eco-leaf))]" />
+                          <p className="text-sm font-semibold text-foreground">What You Can Do</p>
+                        </div>
+                        <div className="space-y-2">
+                          {envData.solutions.citizenActions.map((action, idx) => (
+                            <div key={idx} className="p-2.5 rounded-lg bg-[hsl(var(--eco-leaf)/0.1)] text-sm text-foreground flex items-start gap-2">
+                              <span className="text-[hsl(var(--eco-leaf))]">•</span>
+                              {action}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Local Initiatives */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <MapPin className="w-4 h-4 text-[hsl(var(--eco-water))]" />
+                          <p className="text-sm font-semibold text-foreground">Local Initiatives</p>
+                        </div>
+                        <div className="space-y-2">
+                          {envData.solutions.initiatives.map((initiative, idx) => (
+                            <div key={idx} className="p-2.5 rounded-lg bg-[hsl(var(--eco-water)/0.1)] text-sm text-foreground flex items-start gap-2">
+                              <span className="text-[hsl(var(--eco-water))]">•</span>
+                              {initiative}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* SnapTrash Actions */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Recycle className="w-4 h-4 text-primary" />
+                          <p className="text-sm font-semibold text-foreground">Use SnapTrash</p>
+                        </div>
+                        <div className="space-y-2">
+                          {envData.solutions.snaptrashActions.map((action, idx) => (
+                            <div key={idx} className="p-2.5 rounded-lg bg-primary/10 text-sm text-foreground flex items-start gap-2">
+                              <span className="text-primary">•</span>
+                              {action}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CarouselItem>
+              </CarouselContent>
+              
+              <div className="flex items-center justify-center gap-4 mt-6">
+                <CarouselPrevious className="static translate-y-0 h-10 w-10" />
+                <div className="flex gap-2">
+                  <div className="w-2 h-2 rounded-full bg-primary" />
+                  <div className="w-2 h-2 rounded-full bg-muted" />
+                  <div className="w-2 h-2 rounded-full bg-muted" />
+                  <div className="w-2 h-2 rounded-full bg-muted" />
                 </div>
-              )}
-            </div>
+                <CarouselNext className="static translate-y-0 h-10 w-10" />
+              </div>
+            </Carousel>
+
+            {/* Swipe Hint */}
+            <p className="text-center text-sm text-muted-foreground mt-4 flex items-center justify-center gap-2">
+              <ChevronLeft className="w-4 h-4" />
+              Swipe or use arrows to explore all cards
+              <ChevronRight className="w-4 h-4" />
+            </p>
           </div>
         )}
 
-        {/* Empty State - When location set but no data fetched */}
+        {/* Empty State */}
         {coords && !envData && !isLoading && (
           <div className="glass-card p-12 text-center animate-fade-in">
             <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
