@@ -10,7 +10,7 @@ interface RequestBody {
   longitude: number;
 }
 
-// Fetch air quality from OpenAQ (completely free, no key needed)
+// Fetch air quality from Open-Meteo Air Quality API (completely free, no key needed)
 async function fetchAirQuality(lat: number, lon: number): Promise<{
   aqi: number | null;
   category: string;
@@ -20,75 +20,63 @@ async function fetchAirQuality(lat: number, lon: number): Promise<{
   healthImpact: string;
 } | null> {
   try {
-    const url = `https://api.openaq.org/v2/latest?coordinates=${lat},${lon}&radius=50000&limit=1`;
-    const response = await fetch(url, {
-      headers: { 'Accept': 'application/json' }
-    });
+    // Open-Meteo Air Quality API - free and reliable
+    const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm10,pm2_5,us_aqi`;
+    const response = await fetch(url);
 
     if (!response.ok) {
-      console.log('OpenAQ API returned non-ok status:', response.status);
+      console.log('Open-Meteo AQ API error:', response.status);
       return null;
     }
 
     const data = await response.json();
+    const current = data.current;
     
-    if (!data.results || data.results.length === 0) {
-      console.log('OpenAQ: No monitoring stations found nearby');
+    if (!current) {
+      console.log('Open-Meteo AQ: No current data');
       return null;
     }
 
-    const station = data.results[0];
-    const measurements = station.measurements || [];
+    const aqi = current.us_aqi !== undefined ? Math.round(current.us_aqi) : null;
+    const pm25 = current.pm2_5 !== undefined ? Math.round(current.pm2_5 * 10) / 10 : null;
+    const pm10 = current.pm10 !== undefined ? Math.round(current.pm10 * 10) / 10 : null;
     
-    const pm25 = measurements.find((m: any) => m.parameter === 'pm25')?.value;
-    const pm10 = measurements.find((m: any) => m.parameter === 'pm10')?.value;
-    
-    // Calculate AQI from PM2.5 (US EPA standard)
-    let aqi: number | null = null;
+    // Determine category and health impact based on US AQI
     let category = 'Unknown';
     let healthImpact = 'Data unavailable for health assessment.';
     
-    const pmValue = pm25 ?? (pm10 ? pm10 * 0.5 : null);
-    
-    if (pmValue !== null) {
-      if (pmValue <= 12) {
-        aqi = Math.round((pmValue / 12) * 50);
+    if (aqi !== null) {
+      if (aqi <= 50) {
         category = 'Good';
         healthImpact = 'Air quality is satisfactory. Enjoy outdoor activities!';
-      } else if (pmValue <= 35.4) {
-        aqi = Math.round(50 + ((pmValue - 12) / 23.4) * 50);
+      } else if (aqi <= 100) {
         category = 'Moderate';
         healthImpact = 'Air quality is acceptable. Sensitive individuals should limit prolonged outdoor exertion.';
-      } else if (pmValue <= 55.4) {
-        aqi = Math.round(100 + ((pmValue - 35.4) / 20) * 50);
+      } else if (aqi <= 150) {
         category = 'Unhealthy for Sensitive Groups';
         healthImpact = 'People with respiratory conditions, children, and elderly should reduce outdoor activity.';
-      } else if (pmValue <= 150.4) {
-        aqi = Math.round(150 + ((pmValue - 55.4) / 95) * 50);
+      } else if (aqi <= 200) {
         category = 'Unhealthy';
         healthImpact = 'Everyone may experience health effects. Limit outdoor exposure and wear a mask if necessary.';
-      } else if (pmValue <= 250.4) {
-        aqi = Math.round(200 + ((pmValue - 150.4) / 100) * 50);
+      } else if (aqi <= 300) {
         category = 'Very Unhealthy';
         healthImpact = 'Health alert! Everyone should avoid outdoor activities and use air purifiers indoors.';
       } else {
-        aqi = Math.round(300 + ((pmValue - 250.4) / 150) * 100);
         category = 'Hazardous';
         healthImpact = 'Emergency conditions! Stay indoors, seal windows, and use air purifiers.';
       }
-      aqi = Math.min(aqi, 500);
     }
 
     return {
       aqi,
       category,
-      pm25: pm25 ? Math.round(pm25 * 10) / 10 : null,
-      pm10: pm10 ? Math.round(pm10 * 10) / 10 : null,
-      source: station.location || 'OpenAQ',
+      pm25,
+      pm10,
+      source: 'Open-Meteo',
       healthImpact,
     };
   } catch (error) {
-    console.error('OpenAQ fetch error:', error);
+    console.error('Open-Meteo AQ fetch error:', error);
     return null;
   }
 }
