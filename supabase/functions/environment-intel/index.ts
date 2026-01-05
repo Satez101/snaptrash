@@ -17,9 +17,10 @@ async function fetchAirQuality(lat: number, lon: number): Promise<{
   pm25: number | null;
   pm10: number | null;
   source: string | null;
+  healthImpact: string;
 } | null> {
   try {
-    const url = `https://api.openaq.org/v2/latest?coordinates=${lat},${lon}&radius=25000&limit=1`;
+    const url = `https://api.openaq.org/v2/latest?coordinates=${lat},${lon}&radius=50000&limit=1`;
     const response = await fetch(url, {
       headers: { 'Accept': 'application/json' }
     });
@@ -45,6 +46,7 @@ async function fetchAirQuality(lat: number, lon: number): Promise<{
     // Calculate AQI from PM2.5 (US EPA standard)
     let aqi: number | null = null;
     let category = 'Unknown';
+    let healthImpact = 'Data unavailable for health assessment.';
     
     const pmValue = pm25 ?? (pm10 ? pm10 * 0.5 : null);
     
@@ -52,18 +54,27 @@ async function fetchAirQuality(lat: number, lon: number): Promise<{
       if (pmValue <= 12) {
         aqi = Math.round((pmValue / 12) * 50);
         category = 'Good';
+        healthImpact = 'Air quality is satisfactory. Enjoy outdoor activities!';
       } else if (pmValue <= 35.4) {
         aqi = Math.round(50 + ((pmValue - 12) / 23.4) * 50);
         category = 'Moderate';
+        healthImpact = 'Air quality is acceptable. Sensitive individuals should limit prolonged outdoor exertion.';
       } else if (pmValue <= 55.4) {
         aqi = Math.round(100 + ((pmValue - 35.4) / 20) * 50);
-        category = 'Unhealthy for Sensitive';
+        category = 'Unhealthy for Sensitive Groups';
+        healthImpact = 'People with respiratory conditions, children, and elderly should reduce outdoor activity.';
       } else if (pmValue <= 150.4) {
         aqi = Math.round(150 + ((pmValue - 55.4) / 95) * 50);
         category = 'Unhealthy';
-      } else {
-        aqi = Math.round(200 + ((pmValue - 150.4) / 100) * 100);
+        healthImpact = 'Everyone may experience health effects. Limit outdoor exposure and wear a mask if necessary.';
+      } else if (pmValue <= 250.4) {
+        aqi = Math.round(200 + ((pmValue - 150.4) / 100) * 50);
         category = 'Very Unhealthy';
+        healthImpact = 'Health alert! Everyone should avoid outdoor activities and use air purifiers indoors.';
+      } else {
+        aqi = Math.round(300 + ((pmValue - 250.4) / 150) * 100);
+        category = 'Hazardous';
+        healthImpact = 'Emergency conditions! Stay indoors, seal windows, and use air purifiers.';
       }
       aqi = Math.min(aqi, 500);
     }
@@ -74,6 +85,7 @@ async function fetchAirQuality(lat: number, lon: number): Promise<{
       pm25: pm25 ? Math.round(pm25 * 10) / 10 : null,
       pm10: pm10 ? Math.round(pm10 * 10) / 10 : null,
       source: station.location || 'OpenAQ',
+      healthImpact,
     };
   } catch (error) {
     console.error('OpenAQ fetch error:', error);
@@ -105,7 +117,6 @@ async function fetchWeather(lat: number, lon: number): Promise<{
       return null;
     }
 
-    // Weather code to description mapping
     const weatherDescriptions: Record<number, string> = {
       0: 'Clear sky',
       1: 'Mainly clear',
@@ -163,7 +174,6 @@ async function reverseGeocode(lat: number, lon: number): Promise<{
     const data = await response.json();
     const address = data.address || {};
 
-    // Determine area type from OSM data
     let areaType = 'Residential';
     if (address.industrial || data.type === 'industrial') {
       areaType = 'Industrial';
@@ -190,50 +200,176 @@ async function reverseGeocode(lat: number, lon: number): Promise<{
   }
 }
 
-// Generate AI summary using Lovable AI (only summarizes REAL data)
-async function generateAISummary(
-  location: { city: string; state: string; country: string },
+// Fetch nearby water bodies from Overpass (OpenStreetMap)
+async function fetchNearbyWaterBodies(lat: number, lon: number): Promise<Array<{
+  name: string;
+  type: string;
+}>> {
+  try {
+    const radius = 10000; // 10km radius
+    const query = `
+      [out:json][timeout:10];
+      (
+        way["natural"="water"](around:${radius},${lat},${lon});
+        relation["natural"="water"](around:${radius},${lat},${lon});
+        way["waterway"="river"](around:${radius},${lat},${lon});
+        way["waterway"="stream"](around:${radius},${lat},${lon});
+      );
+      out tags 10;
+    `;
+    
+    const response = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: `data=${encodeURIComponent(query)}`,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+
+    if (!response.ok) {
+      console.log('Overpass API error:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    const waterBodies: Array<{ name: string; type: string }> = [];
+    
+    for (const element of (data.elements || []).slice(0, 5)) {
+      const tags = element.tags || {};
+      if (tags.name) {
+        let type = 'Water Body';
+        if (tags.waterway === 'river') type = 'River';
+        else if (tags.waterway === 'stream') type = 'Stream';
+        else if (tags.water === 'lake' || tags.natural === 'water') type = 'Lake';
+        else if (tags.water === 'pond') type = 'Pond';
+        
+        waterBodies.push({ name: tags.name, type });
+      }
+    }
+    
+    return waterBodies;
+  } catch (error) {
+    console.error('Overpass API error:', error);
+    return [];
+  }
+}
+
+// Fetch nearby industrial facilities from Overpass (OpenStreetMap)
+async function fetchNearbyIndustrial(lat: number, lon: number): Promise<Array<{
+  name: string;
+  type: string;
+}>> {
+  try {
+    const radius = 10000; // 10km radius
+    const query = `
+      [out:json][timeout:10];
+      (
+        way["landuse"="industrial"](around:${radius},${lat},${lon});
+        node["man_made"="works"](around:${radius},${lat},${lon});
+        way["building"="industrial"](around:${radius},${lat},${lon});
+      );
+      out tags 10;
+    `;
+    
+    const response = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: `data=${encodeURIComponent(query)}`,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+
+    if (!response.ok) {
+      console.log('Overpass API error:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    const industrialSites: Array<{ name: string; type: string }> = [];
+    
+    for (const element of (data.elements || []).slice(0, 5)) {
+      const tags = element.tags || {};
+      const name = tags.name || tags.operator || 'Industrial Zone';
+      let type = 'Industrial Area';
+      
+      if (tags['industrial']) {
+        type = tags['industrial'].replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+      } else if (tags['man_made'] === 'works') {
+        type = 'Manufacturing Facility';
+      }
+      
+      industrialSites.push({ name, type });
+    }
+    
+    return industrialSites;
+  } catch (error) {
+    console.error('Overpass API error:', error);
+    return [];
+  }
+}
+
+// Generate comprehensive AI analysis for all flashcards
+async function generateAIAnalysis(
+  location: { city: string; state: string; country: string; areaType: string },
   airQuality: { aqi: number | null; category: string } | null,
   weather: { temperature: number; humidity: number; description: string } | null,
-  areaType: string
-): Promise<string | null> {
+  waterBodies: Array<{ name: string; type: string }>,
+  industrialSites: Array<{ name: string; type: string }>
+): Promise<{
+  summary: string;
+  industrialAnalysis: {
+    pollutionTypes: string[];
+    impactLevel: string;
+    description: string;
+  };
+  waterAnalysis: {
+    pollutionLevel: string;
+    pollutionReasons: string[];
+    description: string;
+  };
+  solutions: {
+    citizenActions: string[];
+    initiatives: string[];
+    snaptrashActions: string[];
+  };
+} | null> {
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   if (!LOVABLE_API_KEY) {
     return null;
   }
 
   try {
-    // Build a factual prompt with ONLY real data
-    const dataPoints: string[] = [];
-    
-    if (airQuality && airQuality.aqi !== null) {
-      dataPoints.push(`Air Quality Index: ${airQuality.aqi} (${airQuality.category})`);
-    } else {
-      dataPoints.push('Air Quality: Data not available from nearby monitoring stations');
-    }
-    
-    if (weather) {
-      dataPoints.push(`Weather: ${weather.temperature}°C, ${weather.humidity}% humidity, ${weather.description}`);
-    } else {
-      dataPoints.push('Weather: Data not available');
-    }
-    
-    dataPoints.push(`Area Classification: ${areaType}`);
-    dataPoints.push(`Location: ${location.city}, ${location.state}, ${location.country}`);
+    const prompt = `You are an environmental analyst for SnapTrash, an eco-awareness app in India.
 
-    const prompt = `You are an environmental advisor for SnapTrash, an eco-friendly waste management app.
+LOCATION: ${location.city}, ${location.state}, ${location.country}
+AREA TYPE: ${location.areaType}
+AIR QUALITY: ${airQuality?.aqi !== null ? `AQI ${airQuality?.aqi} (${airQuality?.category})` : 'Data unavailable'}
+WEATHER: ${weather ? `${weather.temperature}°C, ${weather.humidity}% humidity, ${weather.description}` : 'Data unavailable'}
+NEARBY WATER BODIES: ${waterBodies.length > 0 ? waterBodies.map(w => `${w.name} (${w.type})`).join(', ') : 'None detected in 10km radius'}
+NEARBY INDUSTRIAL ZONES: ${industrialSites.length > 0 ? industrialSites.map(i => `${i.name} (${i.type})`).join(', ') : 'None detected in 10km radius'}
 
-Based on the following REAL environmental data for ${location.city}, provide a brief, friendly summary (2-3 sentences max). Focus on practical advice for the user's day.
-
-DATA:
-${dataPoints.join('\n')}
+Based on this REAL data, provide a JSON response with the following structure:
+{
+  "summary": "A 2-sentence friendly environmental summary for the user",
+  "industrialAnalysis": {
+    "pollutionTypes": ["array of pollution types like air, water, noise, chemical - MAX 3 items"],
+    "impactLevel": "Low/Medium/High based on number and type of industries",
+    "description": "1-2 sentences about industrial impact in this area"
+  },
+  "waterAnalysis": {
+    "pollutionLevel": "Low/Medium/High - estimate based on area type and nearby industries",
+    "pollutionReasons": ["array of likely pollution sources - MAX 3 items"],
+    "description": "1-2 sentences about water body conditions"
+  },
+  "solutions": {
+    "citizenActions": ["3 practical things citizens can do - SHORT phrases"],
+    "initiatives": ["2-3 local/government initiatives common in this region"],
+    "snaptrashActions": ["3 specific SnapTrash features to use - be specific"]
+  }
+}
 
 RULES:
-- Only reference data that is explicitly provided above
-- If data is missing, acknowledge it briefly without guessing
-- Be encouraging and practical
-- Keep it under 60 words
-- No markdown, just plain text`;
+- Only reference data explicitly provided
+- If industrial/water data is empty, say "No major industrial zones/water bodies detected nearby"
+- Keep all text SHORT and youth-friendly
+- Be encouraging and actionable
+- Return ONLY valid JSON, no markdown`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -243,23 +379,35 @@ RULES:
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'user', content: prompt }
-        ],
+        messages: [{ role: 'user', content: prompt }],
       }),
     });
 
     if (!response.ok) {
       if (response.status === 429) {
-        return 'Environmental summary temporarily unavailable. Please try again later.';
+        console.log('AI rate limited');
+        return null;
       }
+      console.log('AI API error:', response.status);
       return null;
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content?.trim() || null;
+    const content = data.choices?.[0]?.message?.content?.trim();
+    
+    if (!content) return null;
+
+    // Parse JSON from response (handle potential markdown wrapping)
+    let jsonStr = content;
+    if (content.includes('```json')) {
+      jsonStr = content.split('```json')[1].split('```')[0].trim();
+    } else if (content.includes('```')) {
+      jsonStr = content.split('```')[1].split('```')[0].trim();
+    }
+    
+    return JSON.parse(jsonStr);
   } catch (error) {
-    console.error('AI summary error:', error);
+    console.error('AI analysis error:', error);
     return null;
   }
 }
@@ -282,18 +430,21 @@ serve(async (req) => {
     console.log(`Environment Intel: Fetching data for ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
 
     // Fetch all data in parallel
-    const [airQuality, weather, location] = await Promise.all([
+    const [airQuality, weather, location, waterBodies, industrialSites] = await Promise.all([
       fetchAirQuality(latitude, longitude),
       fetchWeather(latitude, longitude),
       reverseGeocode(latitude, longitude),
+      fetchNearbyWaterBodies(latitude, longitude),
+      fetchNearbyIndustrial(latitude, longitude),
     ]);
 
-    // Generate AI summary with ONLY the real data we have
-    const summary = await generateAISummary(
-      location || { city: 'Unknown', state: '', country: '' },
+    // Generate comprehensive AI analysis
+    const aiAnalysis = await generateAIAnalysis(
+      location || { city: 'Unknown', state: '', country: '', areaType: 'Unknown' },
       airQuality,
       weather,
-      location?.areaType || 'Unknown'
+      waterBodies,
+      industrialSites
     );
 
     const response = {
@@ -311,8 +462,13 @@ serve(async (req) => {
         pm25: airQuality.pm25,
         pm10: airQuality.pm10,
         source: airQuality.source,
+        healthImpact: airQuality.healthImpact,
         available: airQuality.aqi !== null,
-      } : { available: false, message: 'No air quality monitoring stations found nearby' },
+      } : { 
+        available: false, 
+        message: 'No air quality monitoring stations found nearby',
+        healthImpact: 'Unable to assess air quality. Consider checking local weather services.',
+      },
       weather: weather ? {
         temperature: weather.temperature,
         feelsLike: weather.feelsLike,
@@ -321,7 +477,26 @@ serve(async (req) => {
         description: weather.description,
         available: true,
       } : { available: false, message: 'Weather data unavailable' },
-      summary: summary || 'Environmental summary unavailable.',
+      waterBodies: {
+        list: waterBodies,
+        pollutionLevel: aiAnalysis?.waterAnalysis?.pollutionLevel || 'Unknown',
+        pollutionReasons: aiAnalysis?.waterAnalysis?.pollutionReasons || [],
+        description: aiAnalysis?.waterAnalysis?.description || 'Water body analysis unavailable.',
+        available: waterBodies.length > 0,
+      },
+      industrial: {
+        list: industrialSites,
+        pollutionTypes: aiAnalysis?.industrialAnalysis?.pollutionTypes || [],
+        impactLevel: aiAnalysis?.industrialAnalysis?.impactLevel || 'Unknown',
+        description: aiAnalysis?.industrialAnalysis?.description || 'Industrial analysis unavailable.',
+        available: industrialSites.length > 0,
+      },
+      solutions: aiAnalysis?.solutions || {
+        citizenActions: ['Reduce single-use plastics', 'Use public transport', 'Plant trees'],
+        initiatives: ['Swachh Bharat Mission', 'Local waste segregation programs'],
+        snaptrashActions: ['Scan waste for proper disposal', 'Report illegal dumping', 'Earn EcoCreds by recycling'],
+      },
+      summary: aiAnalysis?.summary || 'Environmental analysis unavailable. Please try again later.',
       fetchedAt: new Date().toISOString(),
     };
 
