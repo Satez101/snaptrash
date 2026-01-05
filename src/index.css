@@ -109,6 +109,11 @@
   }
 }
 
+/* Safe area for iOS bottom nav */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 8px);
+}
+
 @layer components {
   .glass-card {
     @apply bg-card/70 backdrop-blur-xl border border-border/40 rounded-2xl;
